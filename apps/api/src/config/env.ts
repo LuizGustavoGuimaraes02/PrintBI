@@ -13,6 +13,14 @@ const envSchema = z.object({
         .map((origin) => origin.trim())
         .filter(Boolean),
     ),
+  WEB_URL: z.url().default('http://localhost:5173'),
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must have at least 32 characters'),
+  ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  /** A session unused for this long can no longer be refreshed (server-side inactivity logout). */
+  SESSION_IDLE_MINUTES: z.coerce.number().int().positive().default(30),
+  /** Max requests per IP per 15 minutes on sensitive auth routes. */
+  AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(20),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
