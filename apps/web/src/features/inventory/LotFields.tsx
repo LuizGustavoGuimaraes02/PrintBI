@@ -184,7 +184,7 @@ export function RollWarningField({
   className?: string;
 }) {
   const { data: settings } = useSettings();
-  const fallback = settings ? settings.inventory.rollLowStockThreshold / 1_000_000 : 100;
+  const fallback = (settings?.inventory?.rollLowStockThreshold ?? 100_000_000) / 1_000_000;
   return (
     <TextField
       label="Warn when this roll drops below"

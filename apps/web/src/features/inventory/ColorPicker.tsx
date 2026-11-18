@@ -47,7 +47,7 @@ export function ColorPicker({ value, onChange, error }: ColorPickerProps) {
   );
 
   return (
-    <fieldset className="flex flex-col gap-3">
+    <fieldset className="flex min-w-0 flex-col gap-3">
       <legend className="label-mono mb-1 text-ink-muted">
         Color{' '}
         <span className="text-hot" aria-hidden="true">

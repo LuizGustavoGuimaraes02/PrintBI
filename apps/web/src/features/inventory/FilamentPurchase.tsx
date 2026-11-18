@@ -10,14 +10,15 @@ import {
   type InventoryItemView,
   type PaymentMethod,
 } from '@printbi/shared';
-import { Copy, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Copy, Minus, Palette, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import {
   Button,
   ColorSwatch,
   EmptyState,
+  Modal,
   Notice,
   Panel,
   SelectField,
@@ -41,6 +42,7 @@ import {
   today,
   type ItemForm,
 } from './forms';
+import { ColorPicker, type ColorValue } from './ColorPicker';
 import { ItemFields, type InventoryForm } from './ItemFields';
 import { RollWarningField } from './LotFields';
 import { useInventoryItems, useRefreshInventory } from './queries';
@@ -150,6 +152,8 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [recoloring, setRecoloring] = useState<CartLine | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const nextId = () => Math.max(0, ...cart.map((l) => l.id)) + 1;
 
   const { prompt: guard, allowLeave } = useUnsavedChangesGuard(
@@ -203,15 +207,44 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
     });
   });
 
+  /** Brings the editor into view (it sits above the list) and focuses its first field. */
+  const showEditor = () =>
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      editorRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      editorRef.current
+        ?.querySelector<HTMLElement>('input, select, textarea')
+        ?.focus({ preventScroll: true });
+    });
+
+  const editLine = (line: CartLine) => {
+    setEditingId(line.id);
+    loadIntoEditor(line);
+    showEditor();
+  };
+
+  /** The usual next step after buying several colors: copy the line and pick another color. */
   const duplicate = (line: CartLine) => {
     const copy = { ...line, id: nextId(), item: { ...line.item } };
     setCart((all) => {
       const index = all.findIndex((l) => l.id === line.id);
       return [...all.slice(0, index + 1), copy, ...all.slice(index + 1)];
     });
-    setEditingId(copy.id);
-    loadIntoEditor(copy);
+    setRecoloring(copy);
   };
+
+  /** New color for one line; an automatic name follows the color, a typed one is kept. */
+  const recolor = (
+    lineId: number,
+    color: { colorKey: string; colorName: string; colorHex: string },
+  ) =>
+    setCart((all) =>
+      all.map((l) => {
+        if (l.id !== lineId) return l;
+        const automatic = !l.item.name.trim() || l.item.name.trim() === suggestedName(l.item);
+        return { ...l, item: { ...l.item, ...color, name: automatic ? '' : l.item.name } };
+      }),
+    );
 
   const changeRolls = (id: number, delta: number) =>
     setCart((all) =>
@@ -292,62 +325,69 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
   return (
     <>
       {guard}
-      <Panel
-        title={editingId ? 'Edit this line' : 'Roll to add'}
-        description="Set up one roll, add it to the purchase, then change only the color for the next."
-      >
-        <ItemFields form={editor} products={products} />
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <TextField
-            label="Net weight per roll"
-            required
-            inputMode="decimal"
-            mono
-            suffix="g"
-            error={editorErrors.lot?.originalQuantity?.message}
-            {...editor.register('lot.originalQuantity')}
-          />
-          {canSeeFinance && (
-            <div className="grid grid-cols-[1fr_96px] gap-3">
-              <TextField
-                label="Price per roll"
-                inputMode="decimal"
-                mono
-                error={editorErrors.lot?.price?.message}
-                {...editor.register('lot.price')}
-              />
-              <SelectField label="Currency" {...editor.register('lot.currency')}>
-                <option value="CAD">CAD</option>
-                <option value="BRL">BRL</option>
-              </SelectField>
-            </div>
-          )}
-          <TextField
-            label="Rolls of this color"
-            inputMode="numeric"
-            mono
-            error={editorErrors.rolls?.message}
-            {...editor.register('rolls')}
-          />
-          <RollWarningField form={editor} className="" />
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button icon={<Plus size={18} aria-hidden="true" />} onClick={() => void addToCart()}>
-            {editingId ? 'Update line' : 'Add to purchase'}
-          </Button>
-          {editingId && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setEditingId(null);
-                editor.reset(blankEditor());
-              }}
-            >
-              Stop editing
+      <div ref={editorRef} className="scroll-mt-5">
+        <Panel
+          title={editingId ? 'Edit this line' : 'Roll to add'}
+          description={
+            editingId
+              ? 'Change anything here, then press Update line.'
+              : 'Set up one roll, add it to the purchase, then change only the color for the next.'
+          }
+          className={editingId ? 'ring-2 ring-teal' : undefined}
+        >
+          <ItemFields form={editor} products={products} />
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <TextField
+              label="Net weight per roll"
+              required
+              inputMode="decimal"
+              mono
+              suffix="g"
+              error={editorErrors.lot?.originalQuantity?.message}
+              {...editor.register('lot.originalQuantity')}
+            />
+            {canSeeFinance && (
+              <div className="grid grid-cols-[1fr_96px] gap-3">
+                <TextField
+                  label="Price per roll"
+                  inputMode="decimal"
+                  mono
+                  error={editorErrors.lot?.price?.message}
+                  {...editor.register('lot.price')}
+                />
+                <SelectField label="Currency" {...editor.register('lot.currency')}>
+                  <option value="CAD">CAD</option>
+                  <option value="BRL">BRL</option>
+                </SelectField>
+              </div>
+            )}
+            <TextField
+              label="Rolls of this color"
+              inputMode="numeric"
+              mono
+              error={editorErrors.rolls?.message}
+              {...editor.register('rolls')}
+            />
+            <RollWarningField form={editor} className="" />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button icon={<Plus size={18} aria-hidden="true" />} onClick={() => void addToCart()}>
+              {editingId ? 'Update line' : 'Add to purchase'}
             </Button>
-          )}
-        </div>
-      </Panel>
+            {editingId && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setEditingId(null);
+                  editor.reset(blankEditor());
+                }}
+              >
+                Stop editing
+              </Button>
+            )}
+          </div>
+        </Panel>
+      </div>
 
       <Panel
         title="In this purchase"
@@ -376,11 +416,18 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
                   key={line.id}
                   className={`flex flex-wrap items-center gap-4 py-3 ${editingId === line.id ? 'rounded-[var(--radius-tile)] bg-teal-soft/40 px-3' : ''}`}
                 >
-                  <ColorSwatch
-                    stops={stops}
-                    finish={filamentFinish({ colorKey: line.item.colorKey || null })}
-                    size={32}
-                  />
+                  <button
+                    type="button"
+                    aria-label={`Change the color of ${name}`}
+                    onClick={() => setRecoloring(line)}
+                    className="rounded-full p-1 hover:bg-bench"
+                  >
+                    <ColorSwatch
+                      stops={stops}
+                      finish={filamentFinish({ colorKey: line.item.colorKey || null })}
+                      size={32}
+                    />
+                  </button>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <strong>{name}</strong>
                     <span className="figure text-[13px] text-ink-muted">
@@ -424,7 +471,15 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
                       <Plus size={16} aria-hidden="true" />
                     </button>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant="soft"
+                      icon={<Palette size={15} aria-hidden="true" />}
+                      onClick={() => setRecoloring(line)}
+                    >
+                      Color
+                    </Button>
                     <Button
                       size="sm"
                       variant="soft"
@@ -437,10 +492,7 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
                       size="sm"
                       variant="ghost"
                       icon={<Pencil size={15} aria-hidden="true" />}
-                      onClick={() => {
-                        setEditingId(line.id);
-                        loadIntoEditor(line);
-                      }}
+                      onClick={() => editLine(line)}
                     >
                       Edit
                     </Button>
@@ -462,6 +514,16 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
           </ul>
         )}
       </Panel>
+      {recoloring && (
+        <RecolorDialog
+          line={recoloring}
+          onClose={() => setRecoloring(null)}
+          onPick={(color) => {
+            recolor(recoloring.id, color);
+            setRecoloring(null);
+          }}
+        />
+      )}
 
       <Panel title="About this purchase" description="Applies to every roll above.">
         <div className="grid gap-5 sm:grid-cols-2">
@@ -531,5 +593,45 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
         </Button>
       </div>
     </>
+  );
+}
+
+interface RecolorDialogProps {
+  line: CartLine;
+  onPick: (color: ColorValue) => void;
+  onClose: () => void;
+}
+
+/** Picks a new color for one line of the purchase, without leaving the list. */
+function RecolorDialog({ line, onPick, onClose }: RecolorDialogProps) {
+  const [color, setColor] = useState<ColorValue>({
+    colorKey: line.item.colorKey,
+    colorName: line.item.colorName,
+    colorHex: line.item.colorHex,
+  });
+  const chosen = Boolean(color.colorName.trim() && (color.colorKey || color.colorHex));
+  return (
+    <Modal
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title="Choose the color"
+      description={`${line.rolls} ${line.rolls === 1 ? 'roll' : 'rolls'} of ${line.item.brand || ''} ${line.item.productName || line.item.materialType}`.replace(
+        /\s+/g,
+        ' ',
+      )}
+      width="lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={!chosen} onClick={() => onPick(color)}>
+            Use this color
+          </Button>
+        </>
+      }
+    >
+      <ColorPicker value={color} onChange={setColor} />
+    </Modal>
   );
 }

@@ -6,7 +6,7 @@ import { cn } from './cn';
 
 const overlay = 'fixed inset-0 z-40 bg-ink/40 motion-safe:animate-fade-in';
 const content =
-  'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-y-auto rounded-[var(--radius-card)] bg-surface p-6 shadow-[var(--shadow-pop)] outline-none motion-safe:animate-pop-in md:p-8';
+  'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-x-hidden overflow-y-auto rounded-[var(--radius-card)] bg-surface p-6 shadow-[var(--shadow-pop)] outline-none motion-safe:animate-pop-in md:p-8';
 
 interface ModalProps {
   open: boolean;

@@ -435,7 +435,7 @@ function PrinterDialog({ printer, models, onClose }: PrinterDialogProps) {
           </SelectField>
         </div>
 
-        <fieldset className="flex flex-col gap-5 rounded-[var(--radius-tile)] bg-bench p-5">
+        <fieldset className="flex min-w-0 flex-col gap-5 rounded-[var(--radius-tile)] bg-bench p-5">
           <legend className="label-mono float-left mb-1 text-ink-muted">Machine cost</legend>
           <div className="grid gap-5 sm:grid-cols-[1fr_120px]">
             <TextField

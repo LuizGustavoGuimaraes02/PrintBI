@@ -90,12 +90,14 @@ describe('FilamentPurchase', () => {
 
     expect(await screen.findByText('Bambu Lab PLA Jet Black')).toBeInTheDocument();
 
+    // Duplicate opens the color picker right away, on the list itself.
     await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
-    await userEvent.clear(screen.getByLabelText(/search colors/i));
-    await userEvent.type(screen.getByLabelText(/search colors/i), 'hot pink');
-    await userEvent.click(screen.getByRole('button', { name: 'Hot Pink' }));
-    await userEvent.click(screen.getByRole('button', { name: /update line/i }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choose the color' });
+    await userEvent.type(within(dialog).getByLabelText(/search colors/i), 'hot pink');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hot Pink' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Use this color' }));
     expect(await screen.findByText('Bambu Lab PLA Hot Pink')).toBeInTheDocument();
+    expect(screen.getByText('Bambu Lab PLA Jet Black')).toBeInTheDocument();
 
     // Two rolls of hot pink.
     const pinkRow = screen.getByText('Bambu Lab PLA Hot Pink').closest('li') as HTMLElement;
@@ -114,5 +116,37 @@ describe('FilamentPurchase', () => {
       ['Bambu Lab PLA Hot Pink', 2],
     ]);
     expect((post?.init.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy();
+  });
+
+  it('changes the color of a line from the list, keeping its rolls', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.startsWith('/api/v1/inventory/items')
+          ? new Response('[]', { status: 200 })
+          : new Response('{}', { status: 200 }),
+      ),
+    );
+    renderWithApp(<FilamentPurchase currency="CAD" categories={[]} products={[]} />);
+    await userEvent.type(screen.getByLabelText(/^brand/i), 'Bambu Lab');
+    await userEvent.type(screen.getByLabelText(/search colors/i), 'jet black');
+    await userEvent.click(screen.getByRole('button', { name: 'Jet Black' }));
+    await userEvent.clear(screen.getByLabelText(/rolls of this color/i));
+    await userEvent.type(screen.getByLabelText(/rolls of this color/i), '3');
+    await userEvent.click(screen.getByRole('button', { name: /add to purchase/i }));
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /change the color of bambu lab pla jet black/i }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Choose the color' });
+    await userEvent.type(within(dialog).getByLabelText(/search colors/i), 'silk gold silver');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Silk Gold & Silver' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Use this color' }));
+
+    const row = (await screen.findByText('Bambu Lab PLA Silk Gold & Silver')).closest(
+      'li',
+    ) as HTMLElement;
+    expect(within(row).getByText('3×')).toBeInTheDocument();
+    expect(screen.queryByText('Bambu Lab PLA Jet Black')).not.toBeInTheDocument();
   });
 });
