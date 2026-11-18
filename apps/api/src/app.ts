@@ -4,6 +4,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env';
+import { IDEMPOTENCY_HEADER } from '@printbi/shared';
 import { CSRF_HEADER } from './core/auth/cookies';
 import { csrfProtection } from './core/auth/csrf';
 import { apiRateLimit } from './core/auth/rate-limit';
@@ -12,6 +13,9 @@ import { logger } from './core/logger';
 import { authRouter } from './modules/auth/auth.routes';
 import { companiesRouter } from './modules/companies/companies.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { expensesRouter } from './modules/expenses/expenses.routes';
+import { filamentCatalogRouter } from './modules/filament-catalog/filament-catalog.routes';
+import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { invitesRouter } from './modules/invites/invites.routes';
 import { printerCatalogRouter } from './modules/printer-catalog/printer-catalog.routes';
 
@@ -33,7 +37,8 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
     cors({
       origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)),
       credentials: true,
-      allowedHeaders: ['Content-Type', CSRF_HEADER],
+      allowedHeaders: ['Content-Type', CSRF_HEADER, IDEMPOTENCY_HEADER],
+      exposedHeaders: ['Idempotent-Replayed'],
     }),
   );
   app.use(express.json({ limit: '100kb' }));
@@ -50,6 +55,9 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/companies', companiesRouter);
   api.use('/invites', invitesRouter);
   api.use('/printer-models', printerCatalogRouter);
+  api.use('/filament-products', filamentCatalogRouter);
+  api.use('/inventory', inventoryRouter);
+  api.use('/expenses', expensesRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

@@ -77,3 +77,18 @@ describe('printers linked to a catalog model', () => {
     expect(res.body.details).toEqual([{ path: 'modelId', message: 'Unknown printer model' }]);
   });
 });
+
+describe('filament catalog', () => {
+  it('is served to signed-in users with only display fields', async () => {
+    const { client } = await registerWithCompany(app);
+    const res = await client.get('/api/v1/filament-products');
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(400);
+    const basic = res.body.find(
+      (f: { brand: string; product: string }) =>
+        f.brand === 'Bambu Lab' && f.product === 'PETG Basic',
+    );
+    expect(basic).toMatchObject({ type: 'PETG', nozzleTempMin: 230, densityGcm3: 1.27 });
+    expect(basic).not.toHaveProperty('slug');
+  });
+});

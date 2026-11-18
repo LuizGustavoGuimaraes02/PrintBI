@@ -16,3 +16,14 @@ Regenerate it with:
 git clone --depth 1 https://github.com/swordlab/open-3d-printer-database.git <dir>
 npm run catalog:printers -w @printbi/api -- <dir>
 ```
+
+## filament-products.json
+
+Adapted from the same [Open 3D Printer Database](https://github.com/swordlab/open-3d-printer-database)
+(), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+Changes made for PrintBI: only FDM filaments are kept (no resins); material type spellings are
+normalized (for example "PLA-wood" to "PLA-Wood"); entries repeated with the same brand, product
+and type are kept once; only the fields the app uses are kept.
+
+Regenerate it with .

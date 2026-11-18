@@ -34,8 +34,8 @@ export class TestClient {
   get(url: string) {
     return this.agent.get(url).then(this.capture);
   }
-  post(url: string, body: object = {}) {
-    return this.withCsrf(this.agent.post(url)).send(body).then(this.capture);
+  post(url: string, body: object = {}, headers: Record<string, string> = {}) {
+    return this.withCsrf(this.agent.post(url)).set(headers).send(body).then(this.capture);
   }
   put(url: string, body: object = {}) {
     return this.withCsrf(this.agent.put(url)).send(body).then(this.capture);
@@ -75,3 +75,21 @@ export async function registerWithCompany(app: Express, companyName = 'Layer Lab
     throw new Error(`company failed: ${res.status} ${JSON.stringify(res.body)}`);
   return { ...registered, companyId: res.body.activeCompany.id as string };
 }
+
+/** Invites a new user into the admin's company and accepts the invite. */
+export async function addEmployee(app: Express, admin: TestClient, finance: boolean) {
+  const employee = await registerClient(app);
+  const invite = await admin.post('/api/v1/companies/current/invites', {
+    email: employee.email,
+    role: 'employee',
+    finance,
+  });
+  const token = new URL(invite.body.link).pathname.split('/').pop() ?? '';
+  const accepted = await employee.client.post('/api/v1/invites/accept', { token });
+  if (accepted.status !== 200) throw new Error(`accept failed: ${accepted.status}`);
+  return employee;
+}
+
+let keySequence = 0;
+/** A fresh Idempotency-Key, like the web app generates per operation. */
+export const newKey = () => `test-key-${Date.now()}-${++keySequence}`;
