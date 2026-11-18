@@ -24,8 +24,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/orders', label: 'Orders & Printing', icon: Printer, part: '7' },
-  { to: '/inventory', label: 'Inventory', icon: Boxes, part: '3' },
-  { to: '/expenses', label: 'Costs & Expenses', icon: Receipt, part: '3' },
+  { to: '/inventory', label: 'Inventory', icon: Boxes },
+  { to: '/expenses', label: 'Costs & Expenses', icon: Receipt },
   { to: '/products', label: 'Products & Services', icon: Package, part: '4' },
   { to: '/sales', label: 'Sales & Profit', icon: TrendingUp, part: '8' },
   { to: '/calculator', label: 'Calculator', icon: Calculator, part: '5' },

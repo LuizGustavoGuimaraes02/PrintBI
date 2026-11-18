@@ -14,6 +14,8 @@ function page<K extends string>(
 
 const auth = () => import('../features/auth/pages');
 const settings = () => import('../features/settings/pages');
+const inventory = () => import('../features/inventory/pages');
+const expenses = () => import('../features/expenses/pages');
 
 const placeholders: RouteObject[] = NAV_ITEMS.filter((item) => item.part).map((item) => ({
   path: item.to.slice(1),
@@ -47,6 +49,12 @@ export const routes: RouteObject[] = [
             children: [
               { index: true, ...page(() => import('../features/home/HomePage'), 'HomePage') },
               ...placeholders,
+              { path: 'inventory', ...page(inventory, 'InventoryPage') },
+              { path: 'inventory/new', ...page(inventory, 'NewItemPage') },
+              { path: 'inventory/:itemId', ...page(inventory, 'ItemPage') },
+              { path: 'expenses', ...page(expenses, 'ExpensesPage') },
+              { path: 'expenses/new', ...page(expenses, 'NewExpensePage') },
+              { path: 'expenses/:expenseId', ...page(expenses, 'ExpensePage') },
               {
                 path: 'settings',
                 ...page(settings, 'SettingsLayout'),

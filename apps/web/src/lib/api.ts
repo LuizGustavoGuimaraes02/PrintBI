@@ -52,8 +52,13 @@ export function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-function send(method: string, path: string, body?: unknown): Promise<Response> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+function send(
+  method: string,
+  path: string,
+  body?: unknown,
+  extraHeaders: Record<string, string> = {},
+): Promise<Response> {
+  const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (!SAFE_METHODS.has(method)) {
     const csrf = readCookie(CSRF_COOKIE);
@@ -86,19 +91,21 @@ export interface RequestOptions {
    * turns this off: a visitor who never signed in has no session to lose.
    */
   announceExpiry?: boolean;
+  /** Extra headers, such as the Idempotency-Key of a stock operation. */
+  headers?: Record<string, string>;
 }
 
 export async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  { announceExpiry = true }: RequestOptions = {},
+  { announceExpiry = true, headers }: RequestOptions = {},
 ): Promise<T> {
-  let res = await send(method, path, body);
+  let res = await send(method, path, body, headers);
 
   if (res.status === 401 && !NO_REFRESH.includes(path)) {
     if (await refreshSession()) {
-      res = await send(method, path, body);
+      res = await send(method, path, body, headers);
     }
     if (res.status === 401 && announceExpiry) {
       sessionExpiredListeners.forEach((listener) => listener());
@@ -112,7 +119,8 @@ export async function request<T>(
 
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>('GET', path, undefined, options),
-  post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
+  post: <T>(path: string, body: unknown = {}, options?: RequestOptions) =>
+    request<T>('POST', path, body, options),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   delete: <T = void>(path: string) => request<T>('DELETE', path),

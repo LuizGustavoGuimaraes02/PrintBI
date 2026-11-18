@@ -61,7 +61,7 @@ function RemindersForm({ settings }: { settings: CompanySettingsView }) {
     resolver: formResolver(formSchema),
     defaultValues: toForm(settings),
   });
-  const guard = useUnsavedChangesGuard(isDirty);
+  const { prompt: guard } = useUnsavedChangesGuard(isDirty);
   useEffect(() => reset(toForm(settings)), [settings, reset]);
   const enabled = useWatch({ control, name: 'reminders.enabled' });
 

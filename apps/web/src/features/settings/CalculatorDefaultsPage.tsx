@@ -70,7 +70,7 @@ function CalculatorForm({ settings }: { settings: CompanySettingsView }) {
     resolver: formResolver(formSchema),
     defaultValues: toForm(settings),
   });
-  const guard = useUnsavedChangesGuard(isDirty);
+  const { prompt: guard } = useUnsavedChangesGuard(isDirty);
   useEffect(() => reset(toForm(settings)), [settings, reset]);
 
   const onSubmit = handleSubmit(async (values) => {

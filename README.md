@@ -4,7 +4,7 @@ Business manager for small 3D-printing shops: filament spools and consumables, e
 catalog, customers, a manual cost calculator, quote PDFs, a production Kanban, sales and profit,
 a dashboard, and a public product showcase.
 
-> Status: **Part 2 - Web app, design system and settings**. Features arrive in parts; see
+> Status: **Part 3 - Inventory, stock ledger and expenses**. Features arrive in parts; see
 > [Roadmap](#roadmap).
 
 ## Stack
@@ -133,29 +133,76 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 
 ### API endpoints (`/api/v1`)
 
-| Method            | Path                                               | Access                             |
-| ----------------- | -------------------------------------------------- | ---------------------------------- |
-| POST              | `/auth/register`, `/auth/login`                    | Public, rate limited               |
-| POST              | `/auth/refresh`, `/auth/logout`                    | Refresh cookie                     |
-| POST              | `/auth/password/forgot`, `/auth/password/reset`    | Public, rate limited               |
-| GET               | `/auth/me`                                         | Signed in                          |
-| POST              | `/auth/logout-all`, `/auth/switch-company`         | Signed in                          |
-| PUT               | `/auth/password`                                   | Signed in                          |
-| POST              | `/companies`                                       | Signed in                          |
-| GET               | `/companies/current`, `/companies/current/members` | Member                             |
-| PATCH             | `/companies/current`                               | `settings:manage`                  |
-| PATCH, DELETE     | `/companies/current/members/:userId`               | `members:manage`                   |
-| GET, POST         | `/companies/current/invites`                       | `members:manage`                   |
-| DELETE            | `/companies/current/invites/:inviteId`             | `members:manage`                   |
-| GET               | `/companies/current/settings`                      | Member                             |
-| PATCH             | `/companies/current/settings`                      | `settings:manage`                  |
-| GET               | `/companies/current/printers`                      | Member (costs need `finance:view`) |
-| POST, PUT, DELETE | `/companies/current/printers[/:printerId]`         | `settings:manage`                  |
-| GET               | `/companies/current/expense-categories`            | Member                             |
-| POST, PATCH       | `/companies/current/expense-categories[/:id]`      | `settings:manage`                  |
-| GET               | `/invites/:token`                                  | Public preview, rate limited       |
-| POST              | `/invites/accept`                                  | Signed in as the invited email     |
-| GET               | `/printer-models`                                  | Signed in (cached for an hour)     |
+| Method            | Path                                               | Access                               |
+| ----------------- | -------------------------------------------------- | ------------------------------------ |
+| POST              | `/auth/register`, `/auth/login`                    | Public, rate limited                 |
+| POST              | `/auth/refresh`, `/auth/logout`                    | Refresh cookie                       |
+| POST              | `/auth/password/forgot`, `/auth/password/reset`    | Public, rate limited                 |
+| GET               | `/auth/me`                                         | Signed in                            |
+| POST              | `/auth/logout-all`, `/auth/switch-company`         | Signed in                            |
+| PUT               | `/auth/password`                                   | Signed in                            |
+| POST              | `/companies`                                       | Signed in                            |
+| GET               | `/companies/current`, `/companies/current/members` | Member                               |
+| PATCH             | `/companies/current`                               | `settings:manage`                    |
+| PATCH, DELETE     | `/companies/current/members/:userId`               | `members:manage`                     |
+| GET, POST         | `/companies/current/invites`                       | `members:manage`                     |
+| DELETE            | `/companies/current/invites/:inviteId`             | `members:manage`                     |
+| GET               | `/companies/current/settings`                      | Member                               |
+| PATCH             | `/companies/current/settings`                      | `settings:manage`                    |
+| GET               | `/companies/current/printers`                      | Member (costs need `finance:view`)   |
+| POST, PUT, DELETE | `/companies/current/printers[/:printerId]`         | `settings:manage`                    |
+| GET               | `/companies/current/expense-categories`            | Member                               |
+| POST, PATCH       | `/companies/current/expense-categories[/:id]`      | `settings:manage`                    |
+| GET               | `/invites/:token`                                  | Public preview, rate limited         |
+| POST              | `/invites/accept`                                  | Signed in as the invited email       |
+| GET               | `/printer-models`                                  | Signed in (cached for an hour)       |
+| GET               | `/filament-products`                               | Signed in (cached for an hour)       |
+| GET               | `/inventory/summary`, `/inventory/items[/:id]`     | Member (costs need `finance:view`)   |
+| GET               | `/inventory/items/:id/movements`                   | Member                               |
+| POST, PUT         | `/inventory/items[/:id]`                           | Member; key when stock moves         |
+| POST              | `/inventory/items/:id/lots`                        | Member · Idempotency-Key             |
+| PATCH             | `/inventory/items/:id/lots/:lotId`                 | Member (price needs finance)         |
+| POST              | `/inventory/items/:id/lots/:lotId/adjust`          | Member · Idempotency-Key             |
+| POST              | `/inventory/consumptions`                          | Member · Idempotency-Key             |
+| POST              | `/inventory/movements/:id/reverse`                 | Member · Idempotency-Key             |
+| POST              | `/inventory/items/:id/archive`                     | `records:archive`                    |
+| GET               | `/expenses`, `/expenses/summary`, `/expenses/:id`  | `finance:view`                       |
+| POST, PATCH       | `/expenses[/:id]`                                  | `finance:manage`                     |
+| POST, DELETE      | `/expenses/:id/payments[/:paymentId]`              | `finance:manage` (POST: key)         |
+| POST              | `/expenses/:id/cancel`                             | `finance:manage` + `records:archive` |
+
+### Inventory and the stock ledger
+
+- An item is a filament (material, brand, color, diameter, density, temperatures) or another
+  consumable (screws, magnets, boxes...) in its own unit. Tools are expenses, not stock.
+- Every physical roll or purchase is a separate **lot** with its own quantity and price. Its cost
+  per gram (or per unit) is fixed when it is bought and kept as the lot's cost snapshot.
+- Every change goes through an **append-only ledger**: stock in, usage, loss, count corrections and
+  reversals. Rows are never edited or deleted; a wrong entry is fixed by recording its exact opposite,
+  once.
+- Taking stock out is a conditional update in the database (`remaining >= quantity`) inside a
+  transaction. A multi-line usage either deducts every line or none, and stock never goes negative,
+  even under concurrent requests.
+- Every stock-changing request carries an `Idempotency-Key`. Replays and double clicks answer with
+  the original result (`Idempotent-Replayed: true`) instead of writing twice.
+- Recording a purchase as an expense creates one linked expense in the same transaction. A unique
+  index on the lot makes a duplicate impossible. Stock bought before using the app needs no expense.
+- A lot's price can be corrected only until stock is taken from it; after that it belongs to past
+  records.
+- The filament color picker covers the whole spectrum (basics, matte, silk, metallic, neon, glow,
+  translucent, marble, galaxy, wood, carbon, multi-color, rainbow, color-changing) as static shared
+  data, plus custom colors. Spool gauges are drawn in the filament's real color.
+- When adding filament, users can pick one of 460 products from the filament catalog to fill
+  material, diameter, density and temperatures, or type everything by hand.
+
+### Expenses
+
+- Expenses keep their original amount and currency and take one or more payments. The status
+  (pending, partly paid, paid) follows from the payments; a payment can never exceed what is owed.
+- The period summary separates **recorded** (purchases dated in the period), **paid** (payments
+  made in the period, whatever the purchase date) and **still to pay**, per currency. Cancelled
+  expenses stay on record but leave the totals.
+- Only members with financial access see expenses; cancelling also needs the archive permission.
 
 ### Printer catalog
 
@@ -214,8 +261,8 @@ about a minute to start; the test setup allows for that.
 
 0. Foundation
 1. Authentication, companies, members and roles
-2. Web shell, design system and settings (this part)
-3. Inventory (spools and lots, stock ledger) and expenses
+2. Web shell, design system and settings
+3. Inventory (spools and lots, stock ledger) and expenses (this part)
 4. Catalog and customers · 4b public showcase · 4c seasonal showcases
 5. Calculator
 6. Quotes and PDF
@@ -241,6 +288,9 @@ with image storage in Part 4b; more slots are added as features are built.
   licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Only FDM printers and
   selected fields are kept, and brand names are normalized. Details and the regeneration command
   are in [`apps/api/data/NOTICE.md`](apps/api/data/NOTICE.md).
+- **Filament catalog**: adapted from the same database (`materials_catalog.json`), CC BY 4.0. Only
+  FDM filaments and selected fields are kept, and material types are normalized.
+- **Filament colors**: the color catalog is PrintBI's own static list.
 
 ## License
 

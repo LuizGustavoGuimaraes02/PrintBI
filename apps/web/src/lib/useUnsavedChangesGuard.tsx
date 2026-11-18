@@ -1,15 +1,20 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useBlocker } from 'react-router';
 import { ConfirmDialog } from '../design-system';
 
 /**
- * Warns before leaving a form with unsaved changes: in-app navigation shows a
- * dialog, closing or reloading the tab shows the browser's own prompt.
+ * Warns before leaving a form with unsaved changes: in-app navigation shows a dialog,
+ * closing or reloading the tab shows the browser's own prompt.
+ * Call `allowLeave()` right before navigating away after a successful save.
  */
-export function useUnsavedChangesGuard(isDirty: boolean) {
+export function useUnsavedChangesGuard(isDirty: boolean): {
+  prompt: ReactNode;
+  allowLeave: () => void;
+} {
+  const allowed = useRef(false);
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      isDirty && currentLocation.pathname !== nextLocation.pathname,
+      isDirty && !allowed.current && currentLocation.pathname !== nextLocation.pathname,
   );
 
   useEffect(() => {
@@ -19,7 +24,11 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
 
-  return (
+  const allowLeave = useCallback(() => {
+    allowed.current = true;
+  }, []);
+
+  const prompt = (
     <ConfirmDialog
       open={blocker.state === 'blocked'}
       onOpenChange={(open) => !open && blocker.reset?.()}
@@ -31,4 +40,5 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
       onConfirm={() => blocker.proceed?.()}
     />
   );
+  return { prompt, allowLeave };
 }

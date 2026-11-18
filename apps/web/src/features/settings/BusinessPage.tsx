@@ -46,7 +46,7 @@ function BusinessForm({ company }: { company: CompanyView }) {
     resolver: zodResolver(updateCompanyProfileSchema, undefined, { raw: true }),
     defaultValues: toForm(company),
   });
-  const guard = useUnsavedChangesGuard(isDirty);
+  const { prompt: guard } = useUnsavedChangesGuard(isDirty);
 
   useEffect(() => reset(toForm(company)), [company, reset]);
 

@@ -7,3 +7,5 @@ export * from './Surface';
 export * from './Switch';
 export * from './Toast';
 export * from './ImageSlot';
+export * from './ColorSwatch';
+export * from './SearchCombobox';

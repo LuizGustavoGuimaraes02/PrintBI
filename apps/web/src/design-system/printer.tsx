@@ -2,7 +2,7 @@
  * Components drawn from the printer itself. Motion runs only when the viewer has
  * not asked for reduced motion (`motion-safe:`); otherwise each shows a still frame.
  */
-import type { CSSProperties, ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import { cn } from './cn';
 
 /** A nozzle travels over the bed laying down a line: the app-wide loading state. */
@@ -69,8 +69,8 @@ interface SpoolGaugeProps {
   /** Grams (or units) left. */
   remaining: number;
   capacity: number;
-  /** The spool's real color (CSS color). */
-  color: string;
+  /** The spool's real color: one stop, or several for multi-color filament. */
+  color: string | string[];
   size?: number;
   spinning?: boolean;
   label?: string;
@@ -90,6 +90,9 @@ export function SpoolGauge({
   const max = 44;
   const outer = hub + (max - hub) * ratio;
   const percent = Math.round(ratio * 100);
+  const gradientId = useId();
+  const stops = Array.isArray(color) ? color : [color];
+  const fill = stops.length > 1 ? `url(#${gradientId})` : (stops[0] ?? 'var(--color-steel)');
   return (
     <svg
       width={size}
@@ -98,6 +101,15 @@ export function SpoolGauge({
       role="img"
       aria-label={label ?? `Spool with ${percent}% left`}
     >
+      {stops.length > 1 && (
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+            {stops.map((stop, i) => (
+              <stop key={stop + i} offset={`${(i / (stops.length - 1)) * 100}%`} stopColor={stop} />
+            ))}
+          </linearGradient>
+        </defs>
+      )}
       <g
         className={cn(spinning && 'motion-safe:animate-pb-spin')}
         style={{ transformBox: 'fill-box', transformOrigin: 'center' } as CSSProperties}
@@ -117,7 +129,7 @@ export function SpoolGauge({
               cy="52"
               r={(hub + outer) / 2}
               fill="none"
-              stroke={color}
+              stroke={fill}
               strokeWidth={outer - hub}
             />
             <circle
