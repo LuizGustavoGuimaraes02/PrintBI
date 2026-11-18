@@ -163,6 +163,7 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | POST              | `/inventory/items/:id/lots`                        | Member · Idempotency-Key             |
 | PATCH             | `/inventory/items/:id/lots/:lotId`                 | Member (price needs finance)         |
 | POST              | `/inventory/items/:id/lots/:lotId/adjust`          | Member · Idempotency-Key             |
+| POST              | `/inventory/purchases`                             | Member · Idempotency-Key             |
 | POST              | `/inventory/consumptions`                          | Member · Idempotency-Key             |
 | POST              | `/inventory/movements/:id/reverse`                 | Member · Idempotency-Key             |
 | POST              | `/inventory/items/:id/archive`                     | `records:archive`                    |
@@ -186,7 +187,15 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 - Every stock-changing request carries an `Idempotency-Key`. Replays and double clicks answer with
   the original result (`Idempotent-Replayed: true`) instead of writing twice.
 - Recording a purchase as an expense creates one linked expense in the same transaction. A unique
-  index on the lot makes a duplicate impossible. Stock bought before using the app needs no expense.
+  index on the lots it paid for makes a duplicate impossible. Stock bought before using the app needs
+  no expense.
+- **Multi-color purchases**: a whole order is entered like a cart. Set up one roll (product, weight,
+  price, color, number of rolls), add it, then duplicate it and change only the color. Saving creates
+  every roll in one transaction; a filament already in stock (same material, brand, color and
+  diameter) receives the new rolls instead of being duplicated, and one expense covers the order.
+- **Low-stock warnings per roll**: every filament roll warns once it drops below a limit. The default
+  for all rolls is set in Settings → Stock warnings (100 g), and any roll can set its own. Other
+  consumables warn on the item's total.
 - A lot's price can be corrected only until stock is taken from it; after that it belongs to past
   records.
 - The filament color picker covers the whole spectrum (basics, matte, silk, metallic, neon, glow,

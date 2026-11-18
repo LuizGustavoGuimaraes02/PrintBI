@@ -8,6 +8,7 @@ const SECTIONS = [
   { to: 'currency', label: 'Currency' },
   { to: 'calculator', label: 'Calculator defaults' },
   { to: 'printers', label: 'Printers' },
+  { to: 'inventory', label: 'Stock warnings' },
   { to: 'categories', label: 'Expense categories' },
   { to: 'reminders', label: 'Reminders & board' },
 ];

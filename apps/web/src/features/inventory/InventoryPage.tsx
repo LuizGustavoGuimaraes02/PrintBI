@@ -115,7 +115,13 @@ function ItemRow({ item, canSeeFinance }: { item: InventoryItemView; canSeeFinan
             )}
             <strong className="text-[16px]">{item.name}</strong>
             {item.out && <Badge tone="hot">Out of stock</Badge>}
-            {item.low && <Badge tone="hot">Low</Badge>}
+            {item.low && (
+              <Badge tone="hot">
+                {item.kind === 'filament'
+                  ? `${item.lowLots} ${item.lowLots === 1 ? 'roll' : 'rolls'} low`
+                  : 'Low'}
+              </Badge>
+            )}
             {item.archived && <Badge>Archived</Badge>}
           </span>
           <span className="figure truncate text-[13px] text-ink-muted">

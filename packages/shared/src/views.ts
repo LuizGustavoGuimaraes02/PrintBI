@@ -79,6 +79,7 @@ export interface CompanySettingsView {
     printedDays: number;
   };
   board: { completedRetentionDays: number };
+  inventory: { rollLowStockThreshold: number };
 }
 
 export type PrinterRecoveryView = {
@@ -181,6 +182,11 @@ export interface InventoryLotView {
   expenseId: string | null;
   /** True once anything was taken from it: its cost can no longer be edited. */
   used: boolean;
+  /** This roll's own warning limit, or null when it follows the company default. */
+  lowStockThreshold: number | null;
+  /** The limit in force (own or default); null for non-filament lots. */
+  effectiveLowStockThreshold: number | null;
+  low: boolean;
 }
 
 export interface InventoryItemView {
@@ -198,6 +204,8 @@ export interface InventoryItemView {
   /** Totals over lots that are not archived. */
   remaining: number;
   activeLots: number;
+  /** Filament: rolls at or below their warning limit. */
+  lowLots: number;
   low: boolean;
   out: boolean;
   /** Stock value per currency (never summed across currencies); null without `finance:view`. */
@@ -270,7 +278,8 @@ export interface ExpenseView {
   dueDate: string | null;
   notes: string;
   payments: PaymentView[];
-  inventory: { itemId: string; lotId: string; itemName: string } | null;
+  /** Stock lots this expense paid for (one order can cover several rolls). */
+  stock: { itemId: string; lotId: string; itemName: string; lotLabel: string }[];
   cancelled: { at: string; reason: string } | null;
   createdAt: string;
 }

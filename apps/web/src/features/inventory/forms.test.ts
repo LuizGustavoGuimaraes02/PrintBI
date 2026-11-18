@@ -55,3 +55,17 @@ describe('inventory forms', () => {
     ).toBe('Bambu Lab PLA Black');
   });
 });
+
+describe('suggested names with a catalog product', () => {
+  it('uses the product name instead of the bare material', () => {
+    expect(
+      suggestedName({
+        ...emptyItem('filament'),
+        brand: 'Bambu Lab',
+        materialType: 'PLA',
+        productName: 'PLA Basic',
+        colorName: 'Jet Black',
+      }),
+    ).toBe('Bambu Lab PLA Basic Jet Black');
+  });
+});

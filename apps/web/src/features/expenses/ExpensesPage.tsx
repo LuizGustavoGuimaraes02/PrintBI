@@ -246,7 +246,7 @@ function ExpenseTable({ expenses }: { expenses: ExpenseView[] }) {
                   {e.description}
                 </Link>
                 <span className="block text-[13px] text-ink-muted">
-                  {[e.vendor, e.inventory && 'linked to stock'].filter(Boolean).join(' · ')}
+                  {[e.vendor, e.stock.length > 0 && 'linked to stock'].filter(Boolean).join(' · ')}
                 </span>
               </td>
               <td className="border-b border-rule-soft py-3 pr-3">{e.category.name}</td>

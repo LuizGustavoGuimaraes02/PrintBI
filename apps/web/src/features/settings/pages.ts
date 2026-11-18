@@ -6,3 +6,4 @@ export { PrintersPage } from './PrintersPage';
 export { RemindersPage } from './RemindersPage';
 export { SettingsLayout } from './SettingsLayout';
 export { TeamPage } from './TeamPage';
+export { InventorySettingsPage } from './InventorySettingsPage';

@@ -9,6 +9,7 @@ import {
   type InventorySummaryView,
   type itemInputSchema,
   type lotInputSchema,
+  type purchaseSchema,
   type Money,
   type StockMovementView,
   type updateLotSchema,
@@ -17,6 +18,7 @@ import { Types, type ClientSession } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
 import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../../core/errors';
+import { CompanyModel } from '../companies/company.model';
 import { createExpense } from '../expenses/expenses.service';
 import { filamentProductExists } from '../filament-catalog/filament-catalog.service';
 import { UserModel } from '../users/user.model';
@@ -47,6 +49,7 @@ interface LotRecord {
   unitCost?: Money | null;
   expenseId?: Types.ObjectId | null;
   used?: boolean | null;
+  lowStockThreshold?: number | null;
 }
 
 interface ItemRecord {
@@ -72,7 +75,16 @@ interface ItemRecord {
 const money = (m?: Money | null): Money | null =>
   m ? { amount: m.amount, currency: m.currency } : null;
 
-function lotView(lot: LotRecord, finance: boolean): InventoryLotView {
+/** A filament roll warns once it drops below its own limit, or the company default. */
+function rollLimit(lot: LotRecord, rollDefault: number | null): number | null {
+  return rollDefault === null ? null : (lot.lowStockThreshold ?? rollDefault);
+}
+
+const isLowRoll = (lot: LotRecord, limit: number | null) =>
+  limit !== null && lot.status !== 'archived' && lot.remaining > 0 && lot.remaining < limit;
+
+function lotView(lot: LotRecord, finance: boolean, rollDefault: number | null): InventoryLotView {
+  const limit = rollLimit(lot, rollDefault);
   return {
     id: lot._id.toString(),
     label: lot.label,
@@ -87,6 +99,9 @@ function lotView(lot: LotRecord, finance: boolean): InventoryLotView {
     unitCost: finance ? money(lot.unitCost) : null,
     expenseId: finance ? (lot.expenseId?.toString() ?? null) : null,
     used: Boolean(lot.used),
+    lowStockThreshold: rollDefault === null ? null : (lot.lowStockThreshold ?? null),
+    effectiveLowStockThreshold: limit,
+    low: isLowRoll(lot, limit),
   };
 }
 
@@ -101,10 +116,21 @@ function valueOf(lots: LotRecord[]): Money[] {
   return [...totals].map(([currency, amount]) => ({ amount, currency }));
 }
 
-export function itemView(item: ItemRecord, finance: boolean): InventoryItemView {
+/**
+ * Filament warns per roll (own limit or the company default); other consumables warn on
+ * the item's total.
+ */
+export function itemView(
+  item: ItemRecord,
+  finance: boolean,
+  rollDefault: number,
+): InventoryItemView {
   const active = item.lots.filter((l) => l.status !== 'archived');
   const remaining = active.reduce((sum, l) => sum + l.remaining, 0);
-  const threshold = item.lowStockThreshold ?? null;
+  const filament = item.kind === 'filament';
+  const threshold = filament ? null : (item.lowStockThreshold ?? null);
+  const rolls = filament ? rollDefault : null;
+  const lowLots = filament ? active.filter((l) => isLowRoll(l, rollLimit(l, rolls))).length : 0;
   const f = item.filament;
   return {
     id: item._id.toString(),
@@ -135,10 +161,11 @@ export function itemView(item: ItemRecord, finance: boolean): InventoryItemView 
     archived: Boolean(item.archivedAt),
     remaining,
     activeLots: active.filter((l) => l.status !== 'empty').length,
+    lowLots,
     out: remaining === 0,
-    low: threshold !== null && remaining > 0 && remaining <= threshold,
+    low: filament ? lowLots > 0 : threshold !== null && remaining > 0 && remaining <= threshold,
     value: finance ? valueOf(item.lots) : null,
-    lots: item.lots.map((lot) => lotView(lot, finance)),
+    lots: item.lots.map((lot) => lotView(lot, finance, rolls)),
     updatedAt: item.updatedAt.toISOString(),
   };
 }
@@ -155,8 +182,20 @@ async function loadItem(
   return item as unknown as ItemRecord;
 }
 
+const DEFAULT_ROLL_WARNING = 100_000_000; // 100 g
+
+/** The company's default warning limit for filament rolls. */
+async function rollDefault(companyId: Types.ObjectId): Promise<number> {
+  const company = await CompanyModel.findById(companyId, { 'settings.inventory': 1 }).lean();
+  return company?.settings?.inventory?.rollLowStockThreshold ?? DEFAULT_ROLL_WARNING;
+}
+
 export async function getItem(actor: Actor, itemId: Types.ObjectId): Promise<InventoryItemView> {
-  return itemView(await loadItem(actor.companyId, itemId), actor.canSeeFinance);
+  const [item, limit] = await Promise.all([
+    loadItem(actor.companyId, itemId),
+    rollDefault(actor.companyId),
+  ]);
+  return itemView(item, actor.canSeeFinance, limit);
 }
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -184,22 +223,28 @@ export async function listItems(actor: Actor, filters: ItemFilters): Promise<Inv
       { 'filament.materialType': pattern },
     ];
   }
-  const items = (await InventoryItemModel.find(query)
-    .sort({ kind: 1, name: 1 })
-    .lean()) as unknown as ItemRecord[];
+  const [items, limit] = await Promise.all([
+    InventoryItemModel.find(query).sort({ kind: 1, name: 1 }).lean() as unknown as Promise<
+      ItemRecord[]
+    >,
+    rollDefault(actor.companyId),
+  ]);
   return items
-    .map((item) => itemView(item, actor.canSeeFinance))
+    .map((item) => itemView(item, actor.canSeeFinance, limit))
     .filter((view) =>
       filters.stock === 'low' ? view.low : filters.stock === 'out' ? view.out : true,
     );
 }
 
 export async function inventorySummary(actor: Actor): Promise<InventorySummaryView> {
-  const items = (await InventoryItemModel.find({
-    companyId: actor.companyId,
-    archivedAt: null,
-  }).lean()) as unknown as ItemRecord[];
-  const views = items.map((item) => itemView(item, true));
+  const [items, limit] = await Promise.all([
+    InventoryItemModel.find({
+      companyId: actor.companyId,
+      archivedAt: null,
+    }).lean() as unknown as Promise<ItemRecord[]>,
+    rollDefault(actor.companyId),
+  ]);
+  const views = items.map((item) => itemView(item, true, limit));
   const totals = new Map<Currency, number>();
   views
     .flatMap((v) => v.value ?? [])
@@ -209,7 +254,11 @@ export async function inventorySummary(actor: Actor): Promise<InventorySummaryVi
     filamentGrams: views
       .filter((v) => v.kind === 'filament')
       .reduce((sum, v) => sum + v.remaining, 0),
-    lowStockItems: views.filter((v) => v.low).length,
+    // Filament counts each low roll; other consumables count the item.
+    lowStockItems: views.reduce(
+      (sum, v) => sum + (v.kind === 'filament' ? v.lowLots : Number(v.low)),
+      0,
+    ),
     outOfStockItems: views.filter((v) => v.out).length,
     value: actor.canSeeFinance
       ? [...totals].map(([currency, amount]) => ({ amount, currency }))
@@ -312,6 +361,7 @@ async function insertLot(
           notes: lot.notes,
           totalCost: lot.totalCost,
           unitCost,
+          lowStockThreshold: counter.kind === 'filament' ? lot.lowStockThreshold : null,
         },
       },
     },
@@ -339,38 +389,65 @@ async function insertLot(
   );
 
   if (lot.expense && lot.totalCost) {
-    const purchasedAt = lot.purchasedAt ?? new Date();
-    const expenseId = await createExpense(
-      companyId,
-      ctx.actorId,
-      {
-        description: `${counter.name} · ${label}`,
-        categoryId: lot.expense.categoryId,
-        amount: lot.totalCost,
-        purchasedAt,
-        vendor: lot.store,
-        dueDate: null,
-        notes: '',
-        payments: lot.expense.paidAt
-          ? [
-              {
-                amount: lot.totalCost.amount,
-                paidAt: lot.expense.paidAt,
-                method: lot.expense.method,
-                note: '',
-              },
-            ]
-          : [],
-      },
-      { session, inventory: { itemId, lotId } },
-    );
+    await recordPurchaseExpense(ctx, {
+      description: `${counter.name} · ${label}`,
+      expense: lot.expense,
+      amount: lot.totalCost,
+      purchasedAt: lot.purchasedAt,
+      vendor: lot.store,
+      lots: [{ itemId, lotId }],
+    });
+  }
+  return lotId;
+}
+
+/**
+ * One expense for a purchase, linked to every lot it paid for (one roll, or a whole order).
+ * Runs inside the purchase transaction; the unique index on `stock.lotId` blocks duplicates.
+ */
+async function recordPurchaseExpense(
+  ctx: LedgerContext,
+  purchase: {
+    description: string;
+    expense: NonNullable<LotInput['expense']>;
+    amount: Money;
+    purchasedAt: Date | null;
+    vendor: string;
+    lots: { itemId: Types.ObjectId; lotId: Types.ObjectId }[];
+  },
+): Promise<void> {
+  const { companyId, session } = ctx;
+  const expenseId = await createExpense(
+    companyId,
+    ctx.actorId,
+    {
+      description: purchase.description,
+      categoryId: purchase.expense.categoryId,
+      amount: purchase.amount,
+      purchasedAt: purchase.purchasedAt ?? new Date(),
+      vendor: purchase.vendor,
+      dueDate: null,
+      notes: '',
+      payments: purchase.expense.paidAt
+        ? [
+            {
+              amount: purchase.amount.amount,
+              paidAt: purchase.expense.paidAt,
+              method: purchase.expense.method,
+              note: '',
+            },
+          ]
+        : [],
+    },
+    { session, stock: purchase.lots },
+  );
+  for (const { itemId, lotId } of purchase.lots) {
     await InventoryItemModel.updateOne(
       { _id: itemId, companyId, 'lots._id': lotId },
       { $set: { 'lots.$.expenseId': expenseId } },
       { session },
     );
   }
-  return lotId;
 }
 
 export async function createItem(
@@ -562,6 +639,14 @@ export async function updateLot(
   if (input.store !== undefined) set['lots.$.store'] = input.store;
   if (input.notes !== undefined) set['lots.$.notes'] = input.notes;
   if (input.purchasedAt !== undefined) set['lots.$.purchasedAt'] = input.purchasedAt;
+  if (input.lowStockThreshold !== undefined) {
+    if (item.kind !== 'filament') {
+      throw new ValidationError('Some fields are invalid', [
+        { path: 'lowStockThreshold', message: 'Only filament rolls have their own warning' },
+      ]);
+    }
+    set['lots.$.lowStockThreshold'] = input.lowStockThreshold;
+  }
   if (input.archived !== undefined) {
     set['lots.$.status'] = input.archived
       ? 'archived'
@@ -801,4 +886,162 @@ export async function reverseMovement(
     async (movements) => movements[0],
   );
   return { item: await getItem(actor, original.itemId), replayed };
+}
+
+type PurchaseInput = z.output<typeof purchaseSchema>;
+
+/** The existing active filament with the same material, brand, color and diameter, if any. */
+async function matchingFilament(
+  companyId: Types.ObjectId,
+  fields: Awaited<ReturnType<typeof definition>>,
+  session: ClientSession,
+): Promise<Types.ObjectId | null> {
+  const f = fields.filament;
+  if (!f) return null;
+  const match = await InventoryItemModel.findOne(
+    {
+      companyId,
+      kind: 'filament',
+      archivedAt: null,
+      'filament.materialType': new RegExp(`^${escapeRegex(f.materialType)}$`, 'i'),
+      'filament.brand': new RegExp(`^${escapeRegex(f.brand)}$`, 'i'),
+      'filament.diameterMm': f.diameterMm,
+      ...(f.colorKey
+        ? { 'filament.colorKey': f.colorKey }
+        : { 'filament.colorKey': null, 'filament.colorHex': f.colorHex }),
+    },
+    { _id: 1 },
+    { session },
+  ).lean();
+  return match?._id ?? null;
+}
+
+/**
+ * Records a whole order at once: several filaments or colors, several identical rolls each.
+ * A line matching an existing filament (material, brand, color, diameter) adds rolls to it
+ * instead of creating a duplicate. Everything happens in one transaction, idempotently, and
+ * an optional single expense covers the order.
+ */
+export async function recordPurchase(
+  actor: Actor,
+  input: PurchaseInput,
+  key: string,
+): Promise<{ items: InventoryItemView[]; replayed: boolean }> {
+  const anyCost = input.lines.some((l) => l.totalCost);
+  if (anyCost && !actor.canSeeFinance)
+    throw new ForbiddenError('You cannot record costs without financial access');
+  if (input.expense && !actor.canManageFinance) {
+    throw new ForbiddenError('You cannot record expenses without financial access');
+  }
+  const definitions = await Promise.all(
+    input.lines.map((line) => (line.item ? definition(line.item) : null)),
+  );
+
+  const { result, replayed } = await runOnce(
+    actor.companyId,
+    key,
+    async (session) => {
+      const ctx: LedgerContext = {
+        companyId: actor.companyId,
+        actorId: actor.userId,
+        groupKey: key,
+        session,
+      };
+      const touched: Types.ObjectId[] = [];
+      const lots: { itemId: Types.ObjectId; lotId: Types.ObjectId }[] = [];
+      const names: string[] = [];
+      let line = 0;
+
+      for (const [index, entry] of input.lines.entries()) {
+        const fields = definitions[index];
+        let itemId = entry.itemId ? new Types.ObjectId(entry.itemId) : null;
+        if (itemId) {
+          if (
+            !(await InventoryItemModel.exists({ _id: itemId, companyId: actor.companyId }).session(
+              session,
+            ))
+          ) {
+            throw new NotFoundError('Stock item');
+          }
+        } else if (fields) {
+          itemId = await matchingFilament(actor.companyId, fields, session);
+          if (!itemId) {
+            const created = new InventoryItemModel({
+              ...fields,
+              companyId: actor.companyId,
+              createdBy: actor.userId,
+            });
+            await created.save({ session });
+            itemId = created._id;
+          }
+        }
+        if (!itemId)
+          throw new ValidationError('Some fields are invalid', [
+            { path: `lines.${index}.item`, message: 'Describe the item' },
+          ]);
+
+        for (let roll = 0; roll < entry.rolls; roll += 1) {
+          const lotId = await insertLot(
+            ctx,
+            itemId,
+            {
+              label: '',
+              originalQuantity: entry.originalQuantity,
+              remaining: entry.originalQuantity,
+              totalCost: entry.totalCost,
+              purchasedAt: input.purchasedAt,
+              store: input.store,
+              notes: entry.notes,
+              lowStockThreshold: entry.lowStockThreshold,
+              expense: null,
+            },
+            line,
+          );
+          line += 1;
+          lots.push({ itemId, lotId });
+        }
+        touched.push(itemId);
+        names.push(`${entry.rolls}× ${fields?.name ?? 'stock'}`);
+      }
+
+      if (input.expense) {
+        const currency = input.lines[0]?.totalCost?.currency ?? 'CAD';
+        const total = input.lines.reduce(
+          (sum, l) => sum + (l.totalCost ? l.totalCost.amount * l.rolls : 0),
+          0,
+        );
+        await recordPurchaseExpense(ctx, {
+          description:
+            input.lines.length === 1
+              ? (names[0] ?? 'Stock purchase')
+              : `Filament order · ${lots.length} rolls`,
+          expense: input.expense,
+          amount: { amount: total, currency },
+          purchasedAt: input.purchasedAt,
+          vendor: input.store,
+          lots,
+        });
+      }
+      await audit(
+        {
+          companyId: actor.companyId,
+          actorId: actor.userId,
+          action: 'inventory.purchase_recorded',
+          entity: 'inventory_item',
+          entityId: touched[0] as Types.ObjectId,
+          changes: { lines: input.lines.length, rolls: lots.length },
+        },
+        session,
+      );
+      return [...new Set(touched.map(String))];
+    },
+    async (movements) => [...new Set(movements.map((m) => m.itemId.toString()))],
+  );
+
+  const limit = await rollDefault(actor.companyId);
+  const items = (await InventoryItemModel.find({
+    companyId: actor.companyId,
+    _id: { $in: result },
+  }).lean()) as unknown as ItemRecord[];
+  return { items: items.map((item) => itemView(item, actor.canSeeFinance, limit)), replayed };
 }

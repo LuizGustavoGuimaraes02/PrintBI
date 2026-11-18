@@ -52,6 +52,11 @@ export const boardSettingsSchema = z.object({
   completedRetentionDays: z.coerce.number().int().min(0).max(365),
 });
 
+export const inventorySettingsSchema = z.object({
+  /** Every filament roll warns below this many grams unless the roll sets its own limit. */
+  rollLowStockThreshold: nonNegativeDecimalSchema,
+});
+
 /** Each section is replaced as a whole; omitted sections stay as they are. */
 export const updateSettingsSchema = z
   .object({
@@ -59,6 +64,7 @@ export const updateSettingsSchema = z
     calculator: calculatorDefaultsSchema,
     reminders: reminderSettingsSchema,
     board: boardSettingsSchema,
+    inventory: inventorySettingsSchema,
   })
   .partial();
 

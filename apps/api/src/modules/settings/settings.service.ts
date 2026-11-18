@@ -39,6 +39,7 @@ function toView(settings: SettingsDoc): CompanySettingsView {
       printedDays: reminders?.printedDays ?? 3,
     },
     board: { completedRetentionDays: board?.completedRetentionDays ?? 7 },
+    inventory: { rollLowStockThreshold: settings.inventory?.rollLowStockThreshold ?? 100_000_000 },
   };
 }
 
@@ -72,6 +73,7 @@ export async function updateSettings(
   if (input.calculator) set['settings.calculator'] = input.calculator;
   if (input.reminders) set['settings.reminders'] = input.reminders;
   if (input.board) set['settings.board'] = input.board;
+  if (input.inventory) set['settings.inventory'] = input.inventory;
 
   if (Object.keys(set).length > 0) {
     await CompanyModel.updateOne({ _id: companyId }, { $set: set }, { runValidators: true });

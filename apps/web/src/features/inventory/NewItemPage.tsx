@@ -1,9 +1,18 @@
-import { createItemSchema, type InventoryItemView } from '@printbi/shared';
-import { useEffect } from 'react';
+import {
+  createItemSchema,
+  ITEM_KINDS,
+  type CategoryView,
+  type Currency,
+  type FilamentProductView,
+  type InventoryItemView,
+  type ItemKind,
+} from '@printbi/shared';
+import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import {
   Button,
+  cn,
   Notice,
   PageHeader,
   PageLoader,
@@ -18,6 +27,7 @@ import { useIdempotencyKey } from '../../lib/useIdempotencyKey';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
 import { useCan } from '../auth/account';
 import { useCategories, useSettings } from '../settings/queries';
+import { FilamentPurchase } from './FilamentPurchase';
 import {
   defaultExpenseCategory,
   emptyItem,
@@ -30,27 +40,72 @@ import { ItemFields, type InventoryForm } from './ItemFields';
 import { LotFields } from './LotFields';
 import { useFilamentProducts, useRefreshInventory } from './queries';
 
+const KIND_LABEL: Record<ItemKind, string> = {
+  filament: 'Filament',
+  material: 'Material or part',
+  packaging: 'Packaging',
+  other: 'Other',
+};
+
 export function NewItemPage() {
   const { data: settings } = useSettings();
   const { data: categories } = useCategories();
   const { data: products } = useFilamentProducts();
+  const [kind, setKind] = useState<ItemKind>('filament');
   if (!settings || !categories || !products) return <PageLoader />;
+  const currency = settings.currency.defaultCurrency;
+
   return (
-    <NewItemForm
-      currency={settings.currency.defaultCurrency}
-      categories={categories}
-      products={products}
-    />
+    <>
+      <PageHeader
+        eyebrow="Inventory"
+        title={kind === 'filament' ? 'Add filament' : 'New item'}
+        description={
+          kind === 'filament'
+            ? 'Add every roll of an order at once: set one up, then duplicate it and change the color.'
+            : 'Screws, magnets, boxes or anything else your prints consume.'
+        }
+      />
+      <div role="group" aria-label="Type of item" className="flex flex-wrap gap-2 px-1">
+        {ITEM_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={kind === k}
+            onClick={() => setKind(k)}
+            className={cn(
+              'h-11 rounded-full px-5 text-[15px] font-semibold',
+              kind === k ? 'bg-ink text-white' : 'bg-surface text-ink hover:bg-bench',
+            )}
+          >
+            {KIND_LABEL[k]}
+          </button>
+        ))}
+      </div>
+      {kind === 'filament' ? (
+        <FilamentPurchase currency={currency} categories={categories} products={products} />
+      ) : (
+        <SingleItemForm
+          key={kind}
+          kind={kind}
+          currency={currency}
+          categories={categories}
+          products={products}
+        />
+      )}
+    </>
   );
 }
 
-type Props = {
-  currency: 'CAD' | 'BRL';
-  categories: NonNullable<ReturnType<typeof useCategories>['data']>;
-  products: NonNullable<ReturnType<typeof useFilamentProducts>['data']>;
-};
+interface SingleItemFormProps {
+  kind: ItemKind;
+  currency: Currency;
+  categories: CategoryView[];
+  products: FilamentProductView[];
+}
 
-function NewItemForm({ currency, categories, products }: Props) {
+/** One consumable with its first lot (screws, boxes, magnets...). */
+function SingleItemForm({ kind, currency, categories, products }: SingleItemFormProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const refresh = useRefreshInventory();
@@ -59,22 +114,17 @@ function NewItemForm({ currency, categories, products }: Props) {
   const idempotency = useIdempotencyKey();
 
   const defaults = (): InventoryForm => ({
-    item: emptyItem('filament'),
+    item: emptyItem(kind),
     hasStock: true,
-    lot: emptyLot(currency, defaultExpenseCategory(categories, 'filament')),
+    lot: { ...emptyLot(currency, defaultExpenseCategory(categories, kind)), originalQuantity: '' },
+    rolls: '1',
   });
   const form = useForm<InventoryForm>({ defaultValues: defaults() });
   const { control, handleSubmit, setError, reset, setValue, formState } = form;
-  const kind = useWatch({ control, name: 'item.kind' });
   const hasStock = useWatch({ control, name: 'hasStock' });
   const unit = useWatch({ control, name: 'item.unit' });
   const customUnit = useWatch({ control, name: 'item.customUnit' });
   const { prompt: guard, allowLeave } = useUnsavedChangesGuard(formState.isDirty);
-
-  // Each kind of purchase has its usual expense category.
-  useEffect(() => {
-    setValue('lot.expenseCategoryId', defaultExpenseCategory(categories, kind));
-  }, [kind, categories, setValue]);
 
   const submit = (addAnother: boolean) =>
     handleSubmit(async (values) => {
@@ -92,7 +142,7 @@ function NewItemForm({ currency, categories, products }: Props) {
         idempotency.renew();
         await refresh();
         toast.success('Item added', item.name);
-        if (addAnother) reset({ ...defaults(), item: emptyItem(values.item.kind) });
+        if (addAnother) reset(defaults());
         else {
           allowLeave();
           void navigate(`/inventory/${item.id}`);
@@ -102,62 +152,49 @@ function NewItemForm({ currency, categories, products }: Props) {
       }
     });
 
-  const unitText = kind === 'filament' ? 'g' : unitLabel({ unit, customUnit });
-
   return (
-    <>
+    <form onSubmit={(e) => void submit(false)(e)} noValidate className="flex flex-col gap-5">
       {guard}
-      <PageHeader
-        eyebrow="Inventory"
-        title="New item"
-        description="Filament or anything else your prints consume."
-      />
-      <form onSubmit={(e) => void submit(false)(e)} noValidate className="flex flex-col gap-5">
-        <Panel title="What it is">
-          <ItemFields form={form} products={products} />
-        </Panel>
-        <Panel
-          title={kind === 'filament' ? 'First roll' : 'Stock on hand'}
-          description="Each roll or purchase is tracked separately, with its own price."
-        >
-          <SwitchField
-            label={kind === 'filament' ? 'I have a roll of it now' : 'I have some of it now'}
-            description="Turn off to register the item only and add stock later."
-            checked={hasStock}
-            onCheckedChange={(checked) => setValue('hasStock', checked, { shouldDirty: true })}
+      <Panel title="What it is">
+        <ItemFields form={form} products={products} />
+      </Panel>
+      <Panel
+        title="Stock on hand"
+        description="Each purchase is tracked separately, with its own price."
+      >
+        <SwitchField
+          label="I have some of it now"
+          description="Turn off to register the item only and add stock later."
+          checked={hasStock}
+          onCheckedChange={(checked) => setValue('hasStock', checked, { shouldDirty: true })}
+        />
+        {hasStock && (
+          <LotFields
+            form={form}
+            kind={kind}
+            unit={unitLabel({ unit, customUnit })}
+            canSeeFinance={canSeeFinance}
+            canManageFinance={canManageFinance}
+            categories={categories}
           />
-          {hasStock && (
-            <LotFields
-              form={form}
-              kind={kind}
-              unit={unitText}
-              canSeeFinance={canSeeFinance}
-              canManageFinance={canManageFinance}
-              categories={categories}
-            />
-          )}
-        </Panel>
-        {formState.errors.root?.server && (
-          <Notice tone="attention" title="Not saved">
-            {formState.errors.root.server.message}
-          </Notice>
         )}
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit" loading={formState.isSubmitting}>
-            Save
-          </Button>
-          <Button
-            variant="soft"
-            loading={formState.isSubmitting}
-            onClick={() => void submit(true)()}
-          >
-            Save &amp; add another
-          </Button>
-          <Button variant="ghost" onClick={() => void navigate('/inventory')}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </>
+      </Panel>
+      {formState.errors.root?.server && (
+        <Notice tone="attention" title="Not saved">
+          {formState.errors.root.server.message}
+        </Notice>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" loading={formState.isSubmitting}>
+          Save
+        </Button>
+        <Button variant="soft" loading={formState.isSubmitting} onClick={() => void submit(true)()}>
+          Save &amp; add another
+        </Button>
+        <Button variant="ghost" onClick={() => void navigate('/inventory')}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }

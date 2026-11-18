@@ -163,7 +163,7 @@ export function EditItemDialog({ item, onClose }: ItemDialogProps) {
       }
     >
       <form onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-5">
-        <ItemFields form={form} products={products} lockKind />
+        <ItemFields form={form} products={products} />
         {formState.errors.root?.server && (
           <Notice tone="attention" title="Not saved">
             {formState.errors.root.server.message}
@@ -338,6 +338,7 @@ interface LotDetailsForm {
   purchasedAt: string;
   price: string;
   currency: 'CAD' | 'BRL';
+  lowStockThreshold: string;
 }
 
 /** Label, store and notes; the price only while nothing was taken from the lot yet. */
@@ -354,8 +355,11 @@ export function LotDetailsDialog({ item, lot, onClose }: LotDialogProps) {
       purchasedAt: lot.purchasedAt?.slice(0, 10) ?? '',
       price: toField(lot.totalCost?.amount),
       currency: lot.totalCost?.currency ?? 'CAD',
+      lowStockThreshold:
+        lot.lowStockThreshold === null ? '' : String(lot.lowStockThreshold / 1_000_000),
     },
   });
+  const filament = item.kind === 'filament';
 
   const submit = handleSubmit(async (v) => {
     const payload = {
@@ -363,6 +367,7 @@ export function LotDetailsDialog({ item, lot, onClose }: LotDialogProps) {
       store: v.store,
       notes: v.notes,
       purchasedAt: v.purchasedAt || null,
+      ...(filament && { lowStockThreshold: v.lowStockThreshold.trim() || null }),
       ...(priceEditable && {
         totalCost: v.price.trim() ? { amount: v.price.trim(), currency: v.currency } : null,
       }),
@@ -420,6 +425,23 @@ export function LotDetailsDialog({ item, lot, onClose }: LotDialogProps) {
               <option value="BRL">BRL</option>
             </SelectField>
           </>
+        )}
+        {filament && (
+          <TextField
+            label="Warn when this roll drops below"
+            inputMode="decimal"
+            mono
+            suffix="g"
+            className="sm:col-span-2"
+            placeholder={
+              lot.effectiveLowStockThreshold !== null && lot.lowStockThreshold === null
+                ? `${lot.effectiveLowStockThreshold / 1_000_000} (default)`
+                : 'Default'
+            }
+            hint="Leave empty to follow the default set for every roll in Settings."
+            error={formState.errors.lowStockThreshold?.message}
+            {...register('lowStockThreshold')}
+          />
         )}
         <TextAreaField label="Notes" rows={2} className="sm:col-span-2" {...register('notes')} />
         {formState.errors.root?.server && (

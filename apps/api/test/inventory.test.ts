@@ -162,7 +162,7 @@ describe('linked purchase expense', () => {
       vendor: 'Amazon',
       description: 'PLA Black · Roll 1',
     });
-    expect(expense?.inventory?.lotId.toString()).toBe(first.body.lots[0].id);
+    expect(expense?.stock.map((s) => s.lotId.toString())).toEqual([first.body.lots[0].id]);
     expect(first.body.lots[0].expenseId).toBe(expense?._id.toString());
   });
 

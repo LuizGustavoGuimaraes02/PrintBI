@@ -65,6 +65,7 @@ export const routes: RouteObject[] = [
                   { path: 'currency', ...page(settings, 'CurrencyPage') },
                   { path: 'calculator', ...page(settings, 'CalculatorDefaultsPage') },
                   { path: 'printers', ...page(settings, 'PrintersPage') },
+                  { path: 'inventory', ...page(settings, 'InventorySettingsPage') },
                   { path: 'categories', ...page(settings, 'CategoriesPage') },
                   { path: 'reminders', ...page(settings, 'RemindersPage') },
                 ],

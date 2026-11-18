@@ -28,16 +28,18 @@ const expenseSchema = new Schema(
     dueDate: { type: Date, default: null },
     notes: { type: String, default: '' },
     payments: { type: [paymentSchema], default: [] },
-    /** The stock lot this expense paid for, when it came from an inventory purchase. */
-    inventory: {
-      type: new Schema(
-        {
-          itemId: { type: Schema.Types.ObjectId, required: true },
-          lotId: { type: Schema.Types.ObjectId, required: true },
-        },
-        { _id: false },
-      ),
-      default: null,
+    /** Stock lots this expense paid for: one roll, or every roll of a multi-color order. */
+    stock: {
+      type: [
+        new Schema(
+          {
+            itemId: { type: Schema.Types.ObjectId, required: true },
+            lotId: { type: Schema.Types.ObjectId, required: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
     cancelledAt: { type: Date, default: null },
     cancelReason: { type: String, default: '' },
@@ -49,10 +51,10 @@ const expenseSchema = new Schema(
 expenseSchema.index({ companyId: 1, purchasedAt: -1 });
 expenseSchema.index({ companyId: 1, status: 1 });
 expenseSchema.index({ companyId: 1, 'payments.paidAt': 1 });
-// One purchase, one expense: the same lot can never be expensed twice.
+// One purchase, one expense: a lot can appear in only one expense (unique across documents).
 expenseSchema.index(
-  { companyId: 1, 'inventory.lotId': 1 },
-  { unique: true, partialFilterExpression: { 'inventory.lotId': { $type: 'objectId' } } },
+  { companyId: 1, 'stock.lotId': 1 },
+  { unique: true, partialFilterExpression: { 'stock.lotId': { $type: 'objectId' } } },
 );
 expenseSchema.plugin(tenantScope);
 

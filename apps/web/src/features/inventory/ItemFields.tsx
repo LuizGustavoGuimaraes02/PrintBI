@@ -1,39 +1,29 @@
-import {
-  CONSUMABLE_CATEGORIES,
-  ITEM_KINDS,
-  MATERIAL_TYPES,
-  type FilamentProductView,
-  type ItemKind,
-} from '@printbi/shared';
+import { CONSUMABLE_CATEGORIES, MATERIAL_TYPES, type FilamentProductView } from '@printbi/shared';
 import { useId } from 'react';
 import { Controller, useWatch, type UseFormReturn } from 'react-hook-form';
-import { cn, SelectField, TextAreaField, TextField } from '../../design-system';
+import { SelectField, TextAreaField, TextField } from '../../design-system';
 import { ColorPicker } from './ColorPicker';
 import { FilamentProductPicker } from './FilamentProductPicker';
-import { applyProduct, emptyItem, suggestedName, type ItemForm, type LotForm } from './forms';
+import { applyProduct, suggestedName, type ItemForm, type LotForm } from './forms';
 
 export interface InventoryForm {
   item: ItemForm;
   hasStock: boolean;
   lot: LotForm;
+  /** Multi-color purchases: identical rolls of this line. */
+  rolls: string;
 }
-
-const KIND_LABEL: Record<ItemKind, string> = {
-  filament: 'Filament',
-  material: 'Material or part',
-  packaging: 'Packaging',
-  other: 'Other',
-};
 
 interface ItemFieldsProps {
   form: UseFormReturn<InventoryForm>;
   products: FilamentProductView[];
-  /** Editing an existing item: the kind cannot switch between filament and the rest. */
-  lockKind?: boolean;
 }
 
-/** What the item is: a filament (material, brand, color, temperatures) or another consumable. */
-export function ItemFields({ form, products, lockKind }: ItemFieldsProps) {
+/**
+ * What the item is: a filament (material, brand, color, temperatures) or another consumable.
+ * The kind is chosen outside (the new-item page), and never changes while editing.
+ */
+export function ItemFields({ form, products }: ItemFieldsProps) {
   const { register, control, setValue, getValues, formState } = form;
   const errors = formState.errors.item;
   const item = useWatch({ control, name: 'item' });
@@ -48,38 +38,8 @@ export function ItemFields({ form, products, lockKind }: ItemFieldsProps) {
       setValue('item.name', suggestedName(after), dirty);
   };
 
-  const chooseKind = (kind: ItemKind) => {
-    const fresh = emptyItem(kind);
-    setValue('item.kind', kind, dirty);
-    setValue('item.unit', fresh.unit, dirty);
-    setValue('item.category', fresh.category, dirty);
-    setValue('item.lowStockThreshold', fresh.lowStockThreshold, dirty);
-  };
-
   return (
     <div className="flex flex-col gap-6">
-      {!lockKind && (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="label-mono mb-1 text-ink-muted">Type of item</legend>
-          <div className="flex flex-wrap gap-2">
-            {ITEM_KINDS.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                aria-pressed={item.kind === kind}
-                onClick={() => chooseKind(kind)}
-                className={cn(
-                  'h-11 rounded-full px-5 text-[15px] font-semibold',
-                  item.kind === kind ? 'bg-ink text-white' : 'bg-bench text-ink hover:bg-rule-soft',
-                )}
-              >
-                {KIND_LABEL[kind]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      )}
-
       {item.kind === 'filament' ? (
         <>
           <FilamentProductPicker
@@ -260,23 +220,24 @@ export function ItemFields({ form, products, lockKind }: ItemFieldsProps) {
       )}
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <TextField
-          label="Warn when left is at or below"
-          inputMode="decimal"
-          mono
-          suffix={
-            item.kind === 'filament'
-              ? 'g'
-              : item.unit === 'custom'
+        {/* Filament warns per roll (see the roll fields); other items warn on their total. */}
+        {item.kind !== 'filament' && (
+          <TextField
+            label="Warn when left is at or below"
+            inputMode="decimal"
+            mono
+            suffix={
+              item.unit === 'custom'
                 ? item.customUnit || 'units'
                 : item.unit === 'unit'
                   ? 'units'
                   : item.unit
-          }
-          hint="Optional. Shows the item as low stock."
-          error={errors?.lowStockThreshold?.message}
-          {...register('item.lowStockThreshold')}
-        />
+            }
+            hint="Optional. Shows the item as low stock."
+            error={errors?.lowStockThreshold?.message}
+            {...register('item.lowStockThreshold')}
+          />
+        )}
         <TextAreaField
           label="Notes"
           rows={2}

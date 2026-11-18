@@ -20,6 +20,8 @@ const lotSchema = new Schema({
   expenseId: { type: Schema.Types.ObjectId, ref: 'Expense', default: null },
   /** Set on the first movement out: the cost can no longer change afterwards. */
   used: { type: Boolean, default: false },
+  /** Filament rolls: own warning limit; null follows the company default. */
+  lowStockThreshold: { ...microField(false), default: null },
 });
 
 const filamentSchema = new Schema(

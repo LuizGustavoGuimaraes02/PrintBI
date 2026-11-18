@@ -10,6 +10,8 @@ import type {
 
 export interface ItemForm {
   kind: ItemKind;
+  /** Catalog product name ("PLA Basic"), only used to suggest a name; never saved. */
+  productName: string;
   name: string;
   lowStockThreshold: string;
   notes: string;
@@ -48,14 +50,17 @@ export interface LotForm {
   paymentState: 'paid' | 'pending';
   paidAt: string;
   method: PaymentMethod;
+  /** Filament rolls: own warning limit in grams; empty follows the company default. */
+  lowStockThreshold: string;
 }
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
 export const emptyItem = (kind: ItemKind = 'filament'): ItemForm => ({
   kind,
+  productName: '',
   name: '',
-  lowStockThreshold: kind === 'filament' ? '100' : '',
+  lowStockThreshold: '',
   notes: '',
   productId: '',
   materialType: 'PLA',
@@ -90,6 +95,7 @@ export const emptyLot = (currency: Currency, expenseCategoryId = ''): LotForm =>
   paymentState: 'paid',
   paidAt: today(),
   method: 'credit',
+  lowStockThreshold: '',
 });
 
 const micro = (value: number | null) => (value === null ? '' : String(value / 1_000_000));
@@ -126,6 +132,7 @@ export function itemToForm(item: InventoryItemView): ItemForm {
 export function applyProduct(form: ItemForm, p: FilamentProductView): Partial<ItemForm> {
   return {
     productId: p.id,
+    productName: p.product,
     brand: p.brand,
     materialType: p.type,
     diameterMm: num(p.diameterMm ?? Number(form.diameterMm || 1.75)),
@@ -137,9 +144,12 @@ export function applyProduct(form: ItemForm, p: FilamentProductView): Partial<It
   };
 }
 
-/** "Bambu Lab PLA Black": the name proposed while the user has not typed their own. */
+/**
+ * The name proposed while the user has not typed their own: "Bambu Lab PLA Basic Jet Black"
+ * when a catalog product was picked, otherwise "Bambu Lab PLA Black".
+ */
 export const suggestedName = (f: ItemForm) =>
-  [f.brand, f.materialType, f.colorName].filter((part) => part.trim()).join(' ');
+  [f.brand, f.productName || f.materialType, f.colorName].filter((part) => part?.trim()).join(' ');
 
 const orNull = (value: string) => (value.trim() === '' ? null : value.trim());
 
@@ -188,6 +198,7 @@ export function toLotPayload(
     purchasedAt: orNull(l.purchasedAt),
     store: l.store,
     notes: l.notes,
+    lowStockThreshold: orNull(l.lowStockThreshold),
     expense:
       withExpense && l.recordExpense
         ? {

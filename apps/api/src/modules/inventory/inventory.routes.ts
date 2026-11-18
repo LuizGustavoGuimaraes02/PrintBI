@@ -6,6 +6,7 @@ import {
   itemInputSchema,
   lotInputSchema,
   objectIdSchema,
+  purchaseSchema,
   reverseMovementSchema,
   updateLotSchema,
 } from '@printbi/shared';
@@ -148,4 +149,10 @@ inventoryRouter.post('/movements/:movementId/reverse', async (req, res) => {
     idempotencyKey(req),
   );
   created(res, replayed, item);
+});
+
+inventoryRouter.post('/purchases', async (req, res) => {
+  const input = parseInput(purchaseSchema, req.body);
+  const { items, replayed } = await service.recordPurchase(actor(req), input, idempotencyKey(req));
+  created(res, replayed, items);
 });

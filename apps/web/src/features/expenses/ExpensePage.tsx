@@ -141,15 +141,34 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
         {expense.dueDate && open && expense.outstanding > 0 && (
           <p className="text-[15px]">Due {dateFormat.format(new Date(expense.dueDate))}</p>
         )}
-        {expense.inventory && (
-          <p className="text-[15px]">
-            Paid for stock:{' '}
-            <Link to={`/inventory/${expense.inventory.itemId}`} className="font-semibold text-teal">
-              {expense.inventory.itemName}
-            </Link>
-            . The roll keeps the cost it was bought at; editing this expense does not change past
-            usage costs.
-          </p>
+        {expense.stock.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="label-mono text-ink-muted">
+              Paid for {expense.stock.length}{' '}
+              {expense.stock.length === 1 ? 'roll or lot' : 'rolls or lots'}
+            </span>
+            <ul className="flex flex-wrap gap-2">
+              {expense.stock.map((s) => (
+                <li key={s.lotId}>
+                  <Link
+                    to={`/inventory/${s.itemId}`}
+                    className="inline-flex h-9 items-center rounded-full bg-bench px-4 text-[14px] font-semibold hover:bg-rule-soft"
+                  >
+                    {s.itemName}
+                    {s.lotLabel && (
+                      <span className="figure ml-2 text-[12px] font-normal text-ink-muted">
+                        {s.lotLabel}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[13px] text-ink-muted">
+              Each roll keeps the cost it was bought at; editing this expense does not change past
+              usage costs.
+            </p>
+          </div>
         )}
         {expense.notes && <p className="text-[15px] text-ink-muted">{expense.notes}</p>}
       </Panel>

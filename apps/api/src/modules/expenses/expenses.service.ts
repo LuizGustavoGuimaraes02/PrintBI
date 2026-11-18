@@ -53,10 +53,15 @@ async function assertUsableCategory(
   }
 }
 
+interface StockNames {
+  items: Map<string, string>;
+  lots: Map<string, string>;
+}
+
 function toView(
   expense: ExpenseRecord,
   names: Map<string, { name: string }>,
-  itemNames: Map<string, string>,
+  stock: StockNames,
 ): ExpenseView {
   const amount = expense.amount as Money;
   return {
@@ -81,13 +86,12 @@ function toView(
       method: p.method as ExpenseView['payments'][number]['method'],
       note: p.note ?? '',
     })),
-    inventory: expense.inventory
-      ? {
-          itemId: expense.inventory.itemId.toString(),
-          lotId: expense.inventory.lotId.toString(),
-          itemName: itemNames.get(expense.inventory.itemId.toString()) ?? 'Stock item',
-        }
-      : null,
+    stock: (expense.stock ?? []).map((s) => ({
+      itemId: s.itemId.toString(),
+      lotId: s.lotId.toString(),
+      itemName: stock.items.get(s.itemId.toString()) ?? 'Stock item',
+      lotLabel: stock.lots.get(s.lotId.toString()) ?? '',
+    })),
     cancelled: expense.cancelledAt
       ? { at: expense.cancelledAt.toISOString(), reason: expense.cancelReason ?? '' }
       : null,
@@ -97,12 +101,23 @@ function toView(
 
 async function toViews(companyId: Types.ObjectId, rows: ExpenseRecord[]): Promise<ExpenseView[]> {
   const names = await categories(companyId);
-  const itemIds = rows.flatMap((r) => (r.inventory ? [r.inventory.itemId] : []));
+  const itemIds = rows.flatMap((r) => (r.stock ?? []).map((s) => s.itemId));
+  type NamedItem = {
+    _id: Types.ObjectId;
+    name: string;
+    lots: { _id: Types.ObjectId; label: string }[];
+  };
   const items = itemIds.length
-    ? await InventoryItemModel.find({ companyId, _id: { $in: itemIds } }, { name: 1 }).lean()
+    ? ((await InventoryItemModel.find(
+        { companyId, _id: { $in: itemIds } },
+        { name: 1, 'lots._id': 1, 'lots.label': 1 },
+      ).lean()) as unknown as NamedItem[])
     : [];
-  const itemNames = new Map(items.map((i) => [i._id.toString(), i.name]));
-  return rows.map((row) => toView(row, names, itemNames));
+  const stock: StockNames = {
+    items: new Map(items.map((i) => [i._id.toString(), i.name])),
+    lots: new Map(items.flatMap((i) => i.lots.map((l) => [l._id.toString(), l.label] as const))),
+  };
+  return rows.map((row) => toView(row, names, stock));
 }
 
 export async function getExpense(
@@ -135,7 +150,7 @@ export async function createExpense(
   input: ExpenseInput,
   options: {
     session?: ClientSession;
-    inventory?: { itemId: Types.ObjectId; lotId: Types.ObjectId };
+    stock?: { itemId: Types.ObjectId; lotId: Types.ObjectId }[];
   } = {},
 ): Promise<Types.ObjectId> {
   await assertUsableCategory(companyId, input.categoryId, options.session);
@@ -154,7 +169,7 @@ export async function createExpense(
         dueDate: input.dueDate,
         notes: input.notes,
         payments: input.payments.map((p) => ({ ...p, createdBy: actorId })),
-        inventory: options.inventory ?? null,
+        stock: options.stock ?? [],
         createdBy: actorId,
       },
     ],

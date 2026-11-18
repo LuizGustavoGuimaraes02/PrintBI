@@ -50,6 +50,10 @@ const settingsSchema = new Schema(
       printedDays: days(3),
     },
     board: { completedRetentionDays: days(7) },
+    inventory: {
+      /** Grams (micro-units) below which a filament roll warns, unless it sets its own. */
+      rollLowStockThreshold: { ...microField(), default: 100_000_000 },
+    },
   },
   { _id: false },
 );

@@ -1,7 +1,9 @@
 import { divide, toMicro, type CategoryView, type ItemKind } from '@printbi/shared';
 import { useWatch, type UseFormReturn } from 'react-hook-form';
+import { Link } from 'react-router';
 import { SelectField, SwitchField, TextAreaField, TextField } from '../../design-system';
 import { showUnitMoney } from '../../lib/money';
+import { useSettings } from '../settings/queries';
 import type { InventoryForm } from './ItemFields';
 
 interface LotFieldsProps {
@@ -76,6 +78,8 @@ export function LotFields({
           {...register('lot.remaining')}
         />
       )}
+
+      {filament && <RollWarningField form={form} />}
 
       {canSeeFinance && (
         <div className="grid gap-5 sm:grid-cols-[1fr_120px]">
@@ -168,5 +172,38 @@ export function LotFields({
         </div>
       )}
     </div>
+  );
+}
+
+/** Optional per-roll warning limit; empty means the company default from Settings. */
+export function RollWarningField({
+  form,
+  className,
+}: {
+  form: UseFormReturn<InventoryForm>;
+  className?: string;
+}) {
+  const { data: settings } = useSettings();
+  const fallback = settings ? settings.inventory.rollLowStockThreshold / 1_000_000 : 100;
+  return (
+    <TextField
+      label="Warn when this roll drops below"
+      inputMode="decimal"
+      mono
+      suffix="g"
+      placeholder={`${fallback} (default)`}
+      hint={
+        <>
+          Leave empty to use the default for every roll, set in{' '}
+          <Link to="/settings/inventory" className="font-semibold text-teal">
+            Settings
+          </Link>
+          .
+        </>
+      }
+      className={className ?? 'sm:max-w-sm'}
+      error={form.formState.errors.lot?.lowStockThreshold?.message}
+      {...form.register('lot.lowStockThreshold')}
+    />
   );
 }

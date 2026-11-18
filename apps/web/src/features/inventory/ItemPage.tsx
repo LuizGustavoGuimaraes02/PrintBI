@@ -201,14 +201,22 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
             label={filament ? 'Rolls in use or sealed' : 'Open lots'}
             value={String(item.activeLots)}
           />
-          <Fact
-            label="Low-stock warning"
-            value={
-              item.lowStockThreshold !== null
-                ? `at ${showQuantity(item.lowStockThreshold, item)}`
-                : 'Off'
-            }
-          />
+          {filament ? (
+            <Fact
+              label="Rolls running low"
+              value={item.lowLots === 0 ? 'None' : String(item.lowLots)}
+              attention={item.lowLots > 0}
+            />
+          ) : (
+            <Fact
+              label="Low-stock warning"
+              value={
+                item.lowStockThreshold !== null
+                  ? `at ${showQuantity(item.lowStockThreshold, item)}`
+                  : 'Off'
+              }
+            />
+          )}
           {canSeeFinance && (
             <Fact
               label="Stock value"
@@ -276,6 +284,7 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                     <span className="flex flex-wrap items-center gap-2">
                       <strong className="text-[17px]">{lot.label}</strong>
                       <Badge tone={STATUS[lot.status].tone}>{STATUS[lot.status].label}</Badge>
+                      {lot.low && <Badge tone="hot">Low</Badge>}
                     </span>
                     <span className="figure text-[13px] text-ink-muted">
                       {[lot.purchasedAt && dateFormat.format(new Date(lot.purchasedAt)), lot.store]
@@ -304,6 +313,14 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                         </Link>
                       </>
                     )}
+                  </p>
+                )}
+                {lot.effectiveLowStockThreshold !== null && lot.status !== 'archived' && (
+                  <p className="figure text-[13px] text-ink-muted">
+                    Warns below {showQuantity(lot.effectiveLowStockThreshold, item)}
+                    {lot.lowStockThreshold === null
+                      ? ' (default for every roll)'
+                      : ' (this roll only)'}
                   </p>
                 )}
                 {lot.notes && <p className="text-[14px] text-ink-muted">{lot.notes}</p>}

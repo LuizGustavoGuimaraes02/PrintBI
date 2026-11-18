@@ -114,6 +114,8 @@ export const lotInputSchema = z
     purchasedAt: z.coerce.date().nullable().default(null),
     store: text(80),
     notes: text(500),
+    /** Filament rolls: warn below this many grams. Null uses the company default. */
+    lowStockThreshold: nonNegativeDecimalSchema.nullable().default(null),
     /** Also record the purchase as one linked expense. Null for stock bought before the app. */
     expense: purchaseExpenseSchema.nullable().default(null),
   })
@@ -141,8 +143,63 @@ export const updateLotSchema = z
     archived: z.boolean(),
     /** Only while nothing has been taken from the lot yet. */
     totalCost: moneyInputSchema.nullable(),
+    /** Null goes back to the company default. */
+    lowStockThreshold: nonNegativeDecimalSchema.nullable(),
   })
   .partial();
+
+/**
+ * Several rolls bought together (one order): each line is a filament and color, created
+ * if new or added to the matching item, with how many identical rolls came.
+ * One optional expense covers the whole order.
+ */
+export const purchaseLineSchema = z.object({
+  /** Add to this existing item; otherwise `item` describes it (matched or created). */
+  itemId: objectIdSchema.nullable().default(null),
+  item: itemInputSchema.nullable().default(null),
+  rolls: z.coerce.number().int().min(1, 'At least one').max(50, 'At most 50 per line'),
+  /** Per roll: net filament weight in grams (or quantity for other items). */
+  originalQuantity: positiveDecimal,
+  /** Per roll. */
+  totalCost: moneyInputSchema.nullable().default(null),
+  lowStockThreshold: nonNegativeDecimalSchema.nullable().default(null),
+  notes: text(500),
+});
+
+export const purchaseSchema = z
+  .object({
+    purchasedAt: z.coerce.date().nullable().default(null),
+    store: text(80),
+    lines: z.array(purchaseLineSchema).min(1, 'Add at least one line').max(50),
+    expense: purchaseExpenseSchema.nullable().default(null),
+  })
+  .superRefine((purchase, ctx) => {
+    purchase.lines.forEach((line, index) => {
+      if (!line.itemId && !line.item) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Describe the item',
+          path: ['lines', index, 'item'],
+        });
+      }
+    });
+    if (!purchase.expense) return;
+    const currencies = new Set(purchase.lines.map((l) => l.totalCost?.currency ?? null));
+    if (currencies.has(null)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Enter a price on every line to record the expense',
+        path: ['expense'],
+      });
+    } else if (currencies.size > 1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'One expense needs one currency on every line',
+        path: ['expense'],
+      });
+    }
+  });
+export type PurchaseInput = z.input<typeof purchaseSchema>;
 
 export const consumptionSchema = z.object({
   type: z.enum(['consumption', 'loss']),
