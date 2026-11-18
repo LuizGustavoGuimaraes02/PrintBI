@@ -1,4 +1,9 @@
-import type { Role, updateCompanyProfileSchema, updateMemberSchema } from '@printbi/shared';
+import type {
+  CompanyView,
+  MemberView,
+  updateCompanyProfileSchema,
+  updateMemberSchema,
+} from '@printbi/shared';
 import mongoose, { type Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
@@ -6,26 +11,6 @@ import { AppError, NotFoundError } from '../../core/errors';
 import { setSessionCompany } from '../auth/sessions';
 import { UserModel } from '../users/user.model';
 import { CompanyModel } from './company.model';
-
-export interface CompanyView {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  website: string;
-  social: string;
-}
-
-export interface MemberView {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: Role;
-  finance: boolean;
-  joinedAt: string | null;
-}
 
 const PROFILE_FIELDS = { name: 1, email: 1, phone: 1, address: 1, website: 1, social: 1 } as const;
 

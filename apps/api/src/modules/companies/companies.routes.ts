@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { authenticate, requireCompany, requirePermission } from '../../core/auth/authenticate';
+import { categoriesRouter } from '../categories/categories.routes';
 import { companyInvitesRouter } from '../invites/invites.routes';
+import { printersRouter } from '../printers/printers.routes';
+import { settingsRouter } from '../settings/settings.routes';
 import * as controller from './companies.controller';
 
 export const companiesRouter = Router();
@@ -25,3 +28,6 @@ companiesRouter.delete(
   controller.removeMember,
 );
 companiesRouter.use('/current/invites', requirePermission('members:manage'), companyInvitesRouter);
+companiesRouter.use('/current/settings', settingsRouter);
+companiesRouter.use('/current/printers', printersRouter);
+companiesRouter.use('/current/expense-categories', categoriesRouter);

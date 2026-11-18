@@ -1,20 +1,10 @@
-import { permissionsFor, type Permission, type Role } from '@printbi/shared';
+import { permissionsFor, type AccountView } from '@printbi/shared';
 import type { Types } from 'mongoose';
 import { UnauthorizedError } from '../../core/errors';
 import { CompanyModel } from '../companies/company.model';
 import { UserModel } from './user.model';
 
-export interface AccountView {
-  user: { id: string; firstName: string; lastName: string; email: string };
-  companies: { id: string; name: string; role: Role }[];
-  activeCompany: {
-    id: string;
-    name: string;
-    role: Role;
-    finance: boolean;
-    permissions: Permission[];
-  } | null;
-}
+export type { AccountView };
 
 /** What the web app needs after sign-in: who I am, my companies, and what I may do. */
 export async function getAccount(

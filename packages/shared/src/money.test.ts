@@ -109,13 +109,22 @@ describe('Money', () => {
     );
   });
 
-  it('formats in the currency locale, rounded to cents by default', () => {
-    expect(formatMoney(money(toMicro('1200'), 'CAD'))).toBe('$1,200.00');
-    expect(formatMoney(money(toMicro('400.5'), 'BRL'))).toMatch(/^R\$\s400,50$/);
-    expect(formatMoney(money(toMicro('2.345'), 'CAD'))).toBe('$2.35');
+  it('formats with an explicit currency code, rounded to cents by default', () => {
+    expect(formatMoney(money(toMicro('1200'), 'CAD'))).toMatch(/^CAD\s1,200\.00$/);
+    expect(formatMoney(money(toMicro('400.5'), 'BRL'))).toMatch(/^BRL\s400,50$/);
+    expect(formatMoney(money(toMicro('2.345'), 'CAD'))).toMatch(/^CAD\s2\.35$/);
+  });
+
+  it('can show the symbol instead of the code', () => {
+    expect(formatMoney(money(toMicro('1200'), 'CAD'), { display: 'symbol' })).toBe('$1,200.00');
+    expect(formatMoney(money(toMicro('400.5'), 'BRL'), { display: 'symbol' })).toMatch(
+      /^R\$\s400,50$/,
+    );
   });
 
   it('formats unit costs with more precision when asked', () => {
-    expect(formatMoney(money(toMicro('0.025'), 'CAD'), { precision: 'unit' })).toBe('$0.025');
+    expect(formatMoney(money(toMicro('0.025'), 'CAD'), { precision: 'unit' })).toMatch(
+      /^CAD\s0\.025$/,
+    );
   });
 });

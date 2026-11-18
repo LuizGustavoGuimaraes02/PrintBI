@@ -4,13 +4,15 @@ Business manager for small 3D-printing shops: filament spools and consumables, e
 catalog, customers, a manual cost calculator, quote PDFs, a production Kanban, sales and profit,
 a dashboard, and a public product showcase.
 
-> Status: **Part 1 - Authentication and companies**. Features arrive in parts; see [Roadmap](#roadmap).
+> Status: **Part 2 - Web app, design system and settings**. Features arrive in parts; see
+> [Roadmap](#roadmap).
 
 ## Stack
 
 | Layer    | Choice                                                                    |
 | -------- | ------------------------------------------------------------------------- |
-| Web      | React 19, Vite, TypeScript                                                |
+| Web      | React 19, Vite, TypeScript, React Router, TanStack Query, React Hook Form |
+| UI       | Tailwind CSS v4, Radix primitives, Lucide icons, self-hosted fonts        |
 | API      | Node 22+, Express 5, TypeScript, Mongoose 9, Zod                          |
 | Database | MongoDB (Atlas in production; a replica set is required for transactions) |
 | Shared   | `@printbi/shared`: Zod schemas, money math, types used by API and web     |
@@ -27,8 +29,14 @@ apps/
       modules/<feature>/  routes → controller → service → model + schema
     test/              Test helpers and integration tests
   web/                 React app
+    src/
+      app/             Providers and routes (pages load on demand)
+      design-system/   Studio Workshop components and printer-made visuals
+      features/<area>/ Pages, hooks and queries per area (auth, settings, ...)
+      layout/          App shell, navigation, sign-in layout
+      lib/             API client, money and form helpers
 packages/
-  shared/              Code shared by API and web (money, schemas)
+  shared/              Code shared by API and web (money, pricing, schemas, permissions, view types)
 ```
 
 ## Getting started
@@ -125,22 +133,54 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 
 ### API endpoints (`/api/v1`)
 
-| Method        | Path                                               | Access                         |
-| ------------- | -------------------------------------------------- | ------------------------------ |
-| POST          | `/auth/register`, `/auth/login`                    | Public, rate limited           |
-| POST          | `/auth/refresh`, `/auth/logout`                    | Refresh cookie                 |
-| POST          | `/auth/password/forgot`, `/auth/password/reset`    | Public, rate limited           |
-| GET           | `/auth/me`                                         | Signed in                      |
-| POST          | `/auth/logout-all`, `/auth/switch-company`         | Signed in                      |
-| PUT           | `/auth/password`                                   | Signed in                      |
-| POST          | `/companies`                                       | Signed in                      |
-| GET           | `/companies/current`, `/companies/current/members` | Member                         |
-| PATCH         | `/companies/current`                               | `settings:manage`              |
-| PATCH, DELETE | `/companies/current/members/:userId`               | `members:manage`               |
-| GET, POST     | `/companies/current/invites`                       | `members:manage`               |
-| DELETE        | `/companies/current/invites/:inviteId`             | `members:manage`               |
-| GET           | `/invites/:token`                                  | Public preview, rate limited   |
-| POST          | `/invites/accept`                                  | Signed in as the invited email |
+| Method            | Path                                               | Access                             |
+| ----------------- | -------------------------------------------------- | ---------------------------------- |
+| POST              | `/auth/register`, `/auth/login`                    | Public, rate limited               |
+| POST              | `/auth/refresh`, `/auth/logout`                    | Refresh cookie                     |
+| POST              | `/auth/password/forgot`, `/auth/password/reset`    | Public, rate limited               |
+| GET               | `/auth/me`                                         | Signed in                          |
+| POST              | `/auth/logout-all`, `/auth/switch-company`         | Signed in                          |
+| PUT               | `/auth/password`                                   | Signed in                          |
+| POST              | `/companies`                                       | Signed in                          |
+| GET               | `/companies/current`, `/companies/current/members` | Member                             |
+| PATCH             | `/companies/current`                               | `settings:manage`                  |
+| PATCH, DELETE     | `/companies/current/members/:userId`               | `members:manage`                   |
+| GET, POST         | `/companies/current/invites`                       | `members:manage`                   |
+| DELETE            | `/companies/current/invites/:inviteId`             | `members:manage`                   |
+| GET               | `/companies/current/settings`                      | Member                             |
+| PATCH             | `/companies/current/settings`                      | `settings:manage`                  |
+| GET               | `/companies/current/printers`                      | Member (costs need `finance:view`) |
+| POST, PUT, DELETE | `/companies/current/printers[/:printerId]`         | `settings:manage`                  |
+| GET               | `/companies/current/expense-categories`            | Member                             |
+| POST, PATCH       | `/companies/current/expense-categories[/:id]`      | `settings:manage`                  |
+| GET               | `/invites/:token`                                  | Public preview, rate limited       |
+| POST              | `/invites/accept`                                  | Signed in as the invited email     |
+
+### Company settings
+
+Settings, printers and expense categories live inside the company document (no extra
+collections): currency (default CAD or BRL plus a manual BRL-per-CAD display rate), calculator
+defaults, reminder thresholds and how long finished cards stay on the board. Printer costs are
+removed from API responses for members without financial access. Machine cost per hour comes from
+[`packages/shared/src/pricing.ts`](packages/shared/src/pricing.ts), shared by the API and the web.
+
+### Web app and design system
+
+The visual direction, **Studio Workshop**, combines soft rounded shapes with a data-dense layout.
+Figures and labels use IBM Plex Mono (a slicer-readout feel), and text uses Schibsted Grotesk.
+Tokens are in [`apps/web/src/styles/index.css`](apps/web/src/styles/index.css).
+
+- Printer-made components: a nozzle laying a line (loading), a spool gauge that thins with use,
+  filament bars for stock and progress, and an idle nozzle over an empty bed (empty states).
+  Motion is off when the system asks for reduced motion.
+- Forms validate with the same Zod schemas as the API and submit decimals as strings. Leaving a
+  form with unsaved changes asks for confirmation.
+- The API client adds the CSRF header, renews an expired access token once (shared by concurrent
+  requests) and sends the user to sign-in when the session cannot be renewed.
+- Signs out after 30 minutes without interaction, with a two-minute warning. Activity in any tab
+  counts, and an active user's session is renewed every 10 minutes.
+- Money is always shown with its currency code (`CAD 1,200.00`), since CAD and BRL can look alike.
+- Pages load on demand. Libraries are split into separate chunks that stay cached between releases.
 
 ### API health
 
@@ -158,8 +198,8 @@ about a minute to start; the test setup allows for that.
 ## Roadmap
 
 0. Foundation
-1. Authentication, companies, members and roles (this part)
-2. Web shell, design system and settings
+1. Authentication, companies, members and roles
+2. Web shell, design system and settings (this part)
 3. Inventory (spools and lots, stock ledger) and expenses
 4. Catalog and customers · 4b public showcase · 4c seasonal showcases
 5. Calculator
@@ -171,8 +211,13 @@ about a minute to start; the test setup allows for that.
 
 ## Image slots
 
-Places where the business owner uploads photos or artwork. The full table (with sizes) is added as
-those features are built (Parts 2 and 4b-4c).
+Places where the business owner uploads their own photos or artwork. Each slot shows its
+recommended size in the app and keeps a placeholder until something is uploaded. Uploads arrive
+with image storage in Part 4b; more slots are added as features are built.
+
+| Slot         | Where it appears                            | Recommended size                | Format / limit          |
+| ------------ | ------------------------------------------- | ------------------------------- | ----------------------- |
+| Company logo | Settings, quote PDF header, showcase header | 512 × 512 (square, transparent) | PNG, SVG or WebP · 1 MB |
 
 ## License
 

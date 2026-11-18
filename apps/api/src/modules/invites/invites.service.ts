@@ -1,4 +1,10 @@
-import type { createInviteSchema, Role } from '@printbi/shared';
+import type {
+  createInviteSchema,
+  InvitePreview,
+  InviteStatus,
+  InviteView,
+  Role,
+} from '@printbi/shared';
 import mongoose, { Types } from 'mongoose';
 import type { z } from 'zod';
 import { env } from '../../config/env';
@@ -10,24 +16,6 @@ import { CompanyModel } from '../companies/company.model';
 import { UserModel } from '../users/user.model';
 
 const INVITE_TTL_MS = 7 * 86_400_000;
-
-export interface InviteView {
-  id: string;
-  email: string;
-  role: Role;
-  finance: boolean;
-  createdAt: string;
-  expiresAt: string;
-}
-
-export type InviteStatus = 'valid' | 'expired' | 'used' | 'revoked';
-
-export interface InvitePreview {
-  companyName: string;
-  email: string;
-  role: Role;
-  status: InviteStatus;
-}
 
 interface InviteRecord {
   _id: Types.ObjectId;

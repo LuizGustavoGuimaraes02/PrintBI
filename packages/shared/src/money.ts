@@ -143,14 +143,21 @@ export interface FormatOptions {
   locale?: string;
   /** 'cents' (default) rounds to 2 decimals; 'unit' keeps up to 4, for unit costs like 0.025/g. */
   precision?: 'cents' | 'unit';
+  /** 'code' (default) shows CAD 1,200.00: explicit, since CAD and BRL both use a dollar-like sign. */
+  display?: 'code' | 'symbol';
 }
 
 export function formatMoney(value: Money, options: FormatOptions = {}): string {
-  const { locale = DEFAULT_LOCALE[value.currency], precision = 'cents' } = options;
+  const {
+    locale = DEFAULT_LOCALE[value.currency],
+    precision = 'cents',
+    display = 'code',
+  } = options;
   const amount = precision === 'cents' ? roundToCents(value.amount) : value.amount;
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: value.currency,
+    currencyDisplay: display,
     minimumFractionDigits: 2,
     maximumFractionDigits: precision === 'cents' ? 2 : 4,
   }).format(amount / MICRO_PER_UNIT);
