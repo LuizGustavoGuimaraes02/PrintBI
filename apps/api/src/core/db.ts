@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { syncPrinterCatalog } from '../modules/printer-catalog/printer-catalog.service';
 import { logger } from './logger';
 
 mongoose.set('strictQuery', true);
@@ -8,6 +9,7 @@ mongoose.set('autoIndex', false);
 export async function connectDatabase(uri: string): Promise<typeof mongoose> {
   const connection = await mongoose.connect(uri, { serverSelectionTimeoutMS: 10_000 });
   await mongoose.syncIndexes();
+  await syncPrinterCatalog();
   logger.info({ db: connection.connection.name }, 'MongoDB connected');
   return connection;
 }

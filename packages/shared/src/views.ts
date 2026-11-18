@@ -90,6 +90,8 @@ export type PrinterRecoveryView = {
 
 export interface PrinterView {
   id: string;
+  /** Catalog model linked to this printer, for its spec sheet. */
+  modelId: string | null;
   name: string;
   brand: string;
   model: string;
@@ -114,3 +116,34 @@ export interface ApiErrorBody {
   code: string;
   details?: { path: string; message: string }[];
 }
+
+/**
+ * A printer model from the bundled FDM catalog (Open 3D Printer Database, CC BY 4.0).
+ * Fields are null when the source has no value for them.
+ */
+export interface PrinterModelView {
+  id: string;
+  brand: string;
+  model: string;
+  fullName: string;
+  buildVolumeMm: { x: number; y: number; z: number } | null;
+  buildVolumeCm3: number | null;
+  nozzleDiameterMm: number | null;
+  maxSpeedMmS: number | null;
+  /** Rated (peak) power from the spec sheet, not the average draw while printing. */
+  ratedPowerW: number | null;
+  heaterPowerW: number | null;
+  typicalNozzleTempC: number | null;
+  typicalBedTempC: number | null;
+  /** Reference retail price in whole euros. */
+  typicalPriceEur: number | null;
+  maintenanceEurPerYear: number | null;
+}
+
+export const PRINTER_CATALOG_ATTRIBUTION = {
+  name: 'Open 3D Printer Database',
+  url: 'https://github.com/swordlab/open-3d-printer-database',
+  license: 'CC BY 4.0',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  note: 'FDM printers only; brand names normalized and fields selected for PrintBI.',
+} as const;

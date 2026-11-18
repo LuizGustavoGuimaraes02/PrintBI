@@ -55,6 +55,7 @@ const settingsSchema = new Schema(
 );
 
 const printerSchema = new Schema({
+  modelId: { type: Schema.Types.ObjectId, ref: 'PrinterModel', default: null },
   name: { type: String, required: true, trim: true },
   brand: { type: String, default: '' },
   model: { type: String, default: '' },

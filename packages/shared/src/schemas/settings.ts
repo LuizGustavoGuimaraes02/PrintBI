@@ -82,6 +82,8 @@ export const printerRecoverySchema = z.object({
 });
 
 export const printerInputSchema = z.object({
+  /** Catalog model this printer was created from (spec sheet), or null when entered by hand. */
+  modelId: objectIdSchema.nullable().default(null),
   name: z.string().trim().min(1, 'Give the printer a name').max(80),
   brand: optionalText(60),
   model: optionalText(60),

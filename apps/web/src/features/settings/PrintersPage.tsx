@@ -4,9 +4,10 @@ import {
   toMicro,
   type Currency,
   type Money,
+  type PrinterModelView,
   type PrinterView,
 } from '@printbi/shared';
-import { Plus } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm, useWatch, type Path } from 'react-hook-form';
 import {
@@ -26,11 +27,14 @@ import { ApiError, api } from '../../lib/api';
 import { applyServerErrors } from '../../lib/forms';
 import { showUnitMoney, toField } from '../../lib/money';
 import { useCan } from '../auth/account';
-import { companyBase, keys, usePrinters, useSaving } from './queries';
+import { PrinterModelPicker } from './PrinterModelPicker';
+import { PrinterSpecSheet } from './PrinterSpecSheet';
+import { companyBase, keys, usePrinterModels, usePrinters, useSaving } from './queries';
 
 type CostMode = 'none' | 'direct' | 'recovery';
 
 interface PrinterForm {
+  modelId: string;
   name: string;
   brand: string;
   model: string;
@@ -50,6 +54,7 @@ interface PrinterForm {
 }
 
 const EMPTY: PrinterForm = {
+  modelId: '',
   name: '',
   brand: '',
   model: '',
@@ -71,6 +76,7 @@ const EMPTY: PrinterForm = {
 function toForm(p: PrinterView): PrinterForm {
   const r = p.recovery;
   return {
+    modelId: p.modelId ?? '',
     name: p.name,
     brand: p.brand,
     model: p.model,
@@ -96,6 +102,7 @@ function toPayload(f: PrinterForm) {
   const money = (amount: string) =>
     amount.trim() ? { amount: amount.trim(), currency: f.currency } : null;
   return {
+    modelId: f.modelId || null,
     name: f.name,
     brand: f.brand,
     model: f.model,
@@ -170,6 +177,9 @@ const STATUS_LABEL: Record<PrinterView['status'], string> = {
 
 export function PrintersPage() {
   const { data: printers } = usePrinters();
+  const { data: models = [] } = usePrinterModels();
+  const modelsById = new Map(models.map((m) => [m.id, m]));
+  const [specFor, setSpecFor] = useState<PrinterView | null>(null);
   const canManage = useCan('settings:manage');
   const canSeeFinance = useCan('finance:view');
   const [editing, setEditing] = useState<PrinterView | 'new' | null>(null);
@@ -240,16 +250,28 @@ export function PrintersPage() {
                     {rate ? `${showUnitMoney(rate)} / h` : 'No machine cost'}
                   </span>
                 )}
-                {canManage && (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="soft" onClick={() => setEditing(printer)}>
-                      Edit
+                <div className="flex flex-wrap gap-2">
+                  {printer.modelId && modelsById.has(printer.modelId) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<FileText size={16} aria-hidden="true" />}
+                      onClick={() => setSpecFor(printer)}
+                    >
+                      Spec sheet
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setArchiving(printer)}>
-                      Archive
-                    </Button>
-                  </div>
-                )}
+                  )}
+                  {canManage && (
+                    <>
+                      <Button size="sm" variant="soft" onClick={() => setEditing(printer)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setArchiving(printer)}>
+                        Archive
+                      </Button>
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}
@@ -259,7 +281,15 @@ export function PrintersPage() {
       {editing && (
         <PrinterDialog
           printer={editing === 'new' ? null : editing}
+          models={models}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {specFor?.modelId && modelsById.get(specFor.modelId) && (
+        <PrinterSpecSheet
+          printer={specFor}
+          model={modelsById.get(specFor.modelId) as PrinterModelView}
+          onClose={() => setSpecFor(null)}
         />
       )}
       <ConfirmDialog
@@ -277,7 +307,13 @@ export function PrintersPage() {
   );
 }
 
-function PrinterDialog({ printer, onClose }: { printer: PrinterView | null; onClose: () => void }) {
+interface PrinterDialogProps {
+  printer: PrinterView | null;
+  models: PrinterModelView[];
+  onClose: () => void;
+}
+
+function PrinterDialog({ printer, models, onClose }: PrinterDialogProps) {
   const save = useSaving(
     (payload: ReturnType<typeof toPayload>) =>
       printer
@@ -291,12 +327,30 @@ function PrinterDialog({ printer, onClose }: { printer: PrinterView | null; onCl
     handleSubmit,
     control,
     setError,
+    setValue,
+    getValues,
     reset,
     formState: { errors },
   } = useForm<PrinterForm>({ defaultValues: printer ? toForm(printer) : EMPTY });
 
   const values = useWatch({ control }) as PrinterForm;
   const rate = previewRate(values);
+  const selectedModel = models.find((m) => m.id === values.modelId) ?? null;
+
+  /** Picking a model fills the identity fields; the name is kept if the user already typed one. */
+  const selectModel = (model: PrinterModelView | null) => {
+    const dirty = { shouldDirty: true, shouldValidate: false };
+    if (!model) {
+      setValue('modelId', '', dirty);
+      return;
+    }
+    const currentName = getValues('name').trim();
+    if (!currentName || currentName === selectedModel?.fullName)
+      setValue('name', model.fullName, dirty);
+    setValue('modelId', model.id, dirty);
+    setValue('brand', model.brand, dirty);
+    setValue('model', model.model, dirty);
+  };
 
   const submit = (addAnother: boolean) =>
     handleSubmit(async (form) => {
@@ -343,6 +397,7 @@ function PrinterDialog({ printer, onClose }: { printer: PrinterView | null; onCl
       }
     >
       <form onSubmit={(e) => void submit(false)(e)} noValidate className="flex flex-col gap-6">
+        <PrinterModelPicker models={models} selected={selectedModel} onSelect={selectModel} />
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField
             label="Name"
@@ -365,7 +420,11 @@ function PrinterDialog({ printer, onClose }: { printer: PrinterView | null; onCl
             inputMode="numeric"
             mono
             suffix="W"
-            hint="An estimate used for energy cost."
+            hint={
+              selectedModel?.ratedPowerW
+                ? `Used for energy cost. The spec sheet rates it at ${selectedModel.ratedPowerW} W peak; the average while printing is much lower.`
+                : 'An estimate used for energy cost.'
+            }
             error={errors.powerWatts?.message}
             {...register('powerWatts')}
           />

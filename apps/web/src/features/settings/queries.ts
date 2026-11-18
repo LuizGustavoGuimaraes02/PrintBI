@@ -4,6 +4,7 @@ import type {
   CompanyView,
   InviteView,
   MemberView,
+  PrinterModelView,
   PrinterView,
 } from '@printbi/shared';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ export const keys = {
   invites: ['invites'] as const,
   printers: ['printers'] as const,
   categories: ['categories'] as const,
+  printerModels: ['printer-models'] as const,
 };
 
 export const useCompany = () =>
@@ -32,6 +34,13 @@ export const useMembers = () =>
   useQuery({ queryKey: keys.members, queryFn: () => api.get<MemberView[]>(`${base}/members`) });
 export const usePrinters = () =>
   useQuery({ queryKey: keys.printers, queryFn: () => api.get<PrinterView[]>(`${base}/printers`) });
+/** The FDM catalog changes only with a new build: fetch it once per session. */
+export const usePrinterModels = () =>
+  useQuery({
+    queryKey: keys.printerModels,
+    queryFn: () => api.get<PrinterModelView[]>('/printer-models'),
+    staleTime: Infinity,
+  });
 export const useCategories = () =>
   useQuery({
     queryKey: keys.categories,

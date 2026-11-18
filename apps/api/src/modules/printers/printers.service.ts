@@ -2,13 +2,15 @@ import type { Money, PrinterView, printerInputSchema } from '@printbi/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
-import { NotFoundError } from '../../core/errors';
+import { NotFoundError, ValidationError } from '../../core/errors';
+import { printerModelExists } from '../printer-catalog/printer-catalog.service';
 import { CompanyModel } from '../companies/company.model';
 
 type PrinterInput = z.output<typeof printerInputSchema>;
 
 interface PrinterRecord {
   _id: Types.ObjectId;
+  modelId?: Types.ObjectId | null;
   name: string;
   brand?: string | null;
   model?: string | null;
@@ -35,6 +37,7 @@ export function toPrinterView(printer: PrinterRecord, canSeeFinance: boolean): P
   const recovery = printer.recovery;
   return {
     id: printer._id.toString(),
+    modelId: printer.modelId?.toString() ?? null,
     name: printer.name,
     brand: printer.brand ?? '',
     model: printer.model ?? '',
@@ -79,12 +82,24 @@ async function findPrinter(companyId: Types.ObjectId, printerId: Types.ObjectId)
   return printer as PrinterRecord;
 }
 
+/** The catalog id must point at a real model; it becomes an ObjectId for storage. */
+async function withModel(input: PrinterInput) {
+  if (input.modelId === null) return { ...input, modelId: null };
+  const modelId = new Types.ObjectId(input.modelId);
+  if (!(await printerModelExists(modelId))) {
+    throw new ValidationError('Some fields are invalid', [
+      { path: 'modelId', message: 'Unknown printer model' },
+    ]);
+  }
+  return { ...input, modelId };
+}
+
 export async function createPrinter(
   companyId: Types.ObjectId,
   actorId: Types.ObjectId,
   input: PrinterInput,
 ): Promise<PrinterView> {
-  const printer = { _id: new Types.ObjectId(), ...input };
+  const printer = { _id: new Types.ObjectId(), ...(await withModel(input)) };
   await CompanyModel.updateOne(
     { _id: companyId },
     { $push: { printers: printer } },
@@ -107,7 +122,7 @@ export async function updatePrinter(
   input: PrinterInput,
 ): Promise<PrinterView> {
   const set = Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [`printers.$.${key}`, value]),
+    Object.entries(await withModel(input)).map(([key, value]) => [`printers.$.${key}`, value]),
   );
   const result = await CompanyModel.updateOne(
     { _id: companyId, printers: { $elemMatch: { _id: printerId, archivedAt: null } } },

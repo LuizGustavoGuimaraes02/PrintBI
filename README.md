@@ -155,6 +155,21 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | POST, PATCH       | `/companies/current/expense-categories[/:id]`      | `settings:manage`                  |
 | GET               | `/invites/:token`                                  | Public preview, rate limited       |
 | POST              | `/invites/accept`                                  | Signed in as the invited email     |
+| GET               | `/printer-models`                                  | Signed in (cached for an hour)     |
+
+### Printer catalog
+
+When adding a printer, users search a catalog of **162 FDM printers from 33 brands**. Picking one
+fills the name, brand and model, and links a **spec sheet**: build volume, nozzle, maximum speed,
+typical nozzle and bed temperatures, rated and heater power, typical price and maintenance. Any
+field can still be changed, and a printer that is not in the catalog can always be entered by hand.
+
+- The catalog is a shared collection (not company data), loaded from
+  [`apps/api/data/printer-models.json`](apps/api/data/printer-models.json). When the API starts,
+  it brings the database up to date, writing only when the bundled catalog changed.
+- The source's power figure is the **rated (peak)** power. It appears on the spec sheet only. Energy
+  cost uses the average power the user enters, which is much lower in practice.
+- The source has no printer weight, external dimensions or photos, so the app shows none.
 
 ### Company settings
 
@@ -219,6 +234,15 @@ with image storage in Part 4b; more slots are added as features are built.
 | ------------ | ------------------------------------------- | ------------------------------- | ----------------------- |
 | Company logo | Settings, quote PDF header, showcase header | 512 × 512 (square, transparent) | PNG, SVG or WebP · 1 MB |
 
+## Data sources
+
+- **Printer catalog**: adapted from the
+  [Open 3D Printer Database](https://github.com/swordlab/open-3d-printer-database) by swordlab,
+  licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Only FDM printers and
+  selected fields are kept, and brand names are normalized. Details and the regeneration command
+  are in [`apps/api/data/NOTICE.md`](apps/api/data/NOTICE.md).
+
 ## License
 
-[MIT](LICENSE) © Luiz Gustavo Guimaraes
+Code: [MIT](LICENSE) © Luiz Gustavo Guimaraes. Third-party data keeps its own license (see
+[Data sources](#data-sources)).

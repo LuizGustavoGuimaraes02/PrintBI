@@ -13,6 +13,7 @@ import { authRouter } from './modules/auth/auth.routes';
 import { companiesRouter } from './modules/companies/companies.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { invitesRouter } from './modules/invites/invites.routes';
+import { printerCatalogRouter } from './modules/printer-catalog/printer-catalog.routes';
 
 export interface AppOptions {
   corsOrigins?: readonly string[];
@@ -48,6 +49,7 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/auth', authRouter);
   api.use('/companies', companiesRouter);
   api.use('/invites', invitesRouter);
+  api.use('/printer-models', printerCatalogRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
