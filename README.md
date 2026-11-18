@@ -173,3 +173,7 @@ about a minute to start; the test setup allows for that.
 
 Places where the business owner uploads photos or artwork. The full table (with sizes) is added as
 those features are built (Parts 2 and 4b-4c).
+
+## License
+
+[MIT](LICENSE) © Luiz Gustavo Guimaraes
