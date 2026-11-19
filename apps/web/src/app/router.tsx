@@ -19,6 +19,7 @@ const expenses = () => import('../features/expenses/pages');
 const catalog = () => import('../features/catalog/pages');
 const customers = () => import('../features/customers/pages');
 const showcase = () => import('../features/showcase/pages');
+const calculator = () => import('../features/calculator/pages');
 
 const placeholders: RouteObject[] = NAV_ITEMS.filter((item) => item.part).map((item) => ({
   path: item.to.slice(1),
@@ -76,6 +77,9 @@ export const routes: RouteObject[] = [
               { path: 'products/new', ...page(catalog, 'NewProductPage') },
               { path: 'products/:productId', ...page(catalog, 'ProductPage') },
               { path: 'showcase', ...page(settings, 'ShowcasePage') },
+              { path: 'calculator', ...page(calculator, 'CalculatorPage') },
+              { path: 'calculator/saved', ...page(calculator, 'SavedCalculationsPage') },
+              { path: 'calculator/:calculationId', ...page(calculator, 'CalculatorPage') },
               { path: 'customers', ...page(customers, 'CustomersPage') },
               { path: 'customers/:customerId', ...page(customers, 'CustomerPage') },
               {

@@ -4,6 +4,8 @@
  */
 import type { Money } from './money';
 import type { Permission, Role } from './permissions';
+import type { CalcResult } from './calculator';
+import type { CalcInput } from './schemas/calculator';
 
 export interface AccountView {
   user: { id: string; firstName: string; lastName: string; email: string };
@@ -545,4 +547,24 @@ export interface PublicCollectionPageView {
   products: PublicProductCardView[];
   /** True on the admin's preview of a collection that is still hidden. */
   preview: boolean;
+}
+
+/** A saved calculation in the list. Amounts are in the calculation's currency. */
+export interface CalculationSummaryView {
+  id: string;
+  name: string;
+  product: { id: string; name: string } | null;
+  currency: 'CAD' | 'BRL';
+  quantity: number;
+  unitCost: number;
+  /** Null when the price could not be worked out (e.g. a margin of 100%). */
+  unitPrice: number | null;
+  updatedAt: string;
+}
+
+/** A saved calculation with what was entered (micro-units) and the result stored with it. */
+export interface CalculationView extends CalculationSummaryView {
+  notes: string;
+  input: CalcInput;
+  result: CalcResult;
 }

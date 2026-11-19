@@ -191,6 +191,8 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | GET               | `/companies/current/showcase[/products]`               | Member                                  |
 | PUT               | `/companies/current/showcase[/order]`                  | `showcase:manage`                       |
 | GET               | `/public/showcase/:slug[/:productSlug]`                | Public, own rate limit, cached 60 s     |
+| GET, POST         | `/calculations`                                        | `finance:view`                          |
+| GET, PUT, DELETE  | `/calculations/:id`                                    | `finance:view`                          |
 | GET               | `/public/showcase/:slug/c/:collectionSlug`             | Public; 404 while the collection is off |
 | GET               | `/companies/current/showcase/collections`              | Member                                  |
 | PUT               | `/companies/current/showcase/collections/:key`         | `showcase:manage`                       |
@@ -341,6 +343,28 @@ customers and printers they use.
   `products.showcase.collections[]`. A product in a hidden collection still shows on the main
   showcase when it is visible there.
 
+### Calculator
+
+- A manual cost model (no G-code import). Every section can be switched on or off: filament (from
+  a stock roll at its own cost per gram, or typed in from a spool's weight and price), energy
+  (kWh = W ÷ 1000 × hours), labor (activities × hourly rate), machine (a printer's cost per hour or
+  payback plan: (purchase + repairs) ÷ planned hours), materials and consumables, a risk
+  allowance on filament, all materials or the total, and fees and taxes.
+- **Per piece or per batch:** entered time, grams and quantities are multiplied by the number of
+  pieces only when they are per piece, never twice. Results show the cost and price per piece
+  and for the batch.
+- **Price:** by margin (cost ÷ (1 − margin)), by markup (cost × (1 + markup)) or typed in, always
+  showing profit, margin and markup. Fees taken from the price (platform, card, tax included) are
+  solved algebraically, so the price never depends on itself; tax added on top is shown as what
+  the customer pays and never counts as revenue. Nothing about taxes is assumed.
+- **One engine, two places:** `packages/shared/src/calculator.ts` runs live in the browser and
+  again on the server when a calculation is saved, after the server replaces the page's numbers
+  with the records: each roll's real cost and stock, the printer's rate and the CAD/BRL rate. A
+  line in the other currency needs that rate; without it the result is marked incomplete instead
+  of adding different currencies. Estimates never touch stock; going past a roll's grams warns.
+- Saved calculations keep their inputs and result as a snapshot. Saving can also write the unit
+  cost into the linked product's estimated cost. The calculator needs `finance:view`.
+
 ### Printer catalog
 
 When adding a printer, users search a catalog of **162 FDM printers from 33 brands**. Picking one
@@ -400,8 +424,8 @@ about a minute to start; the test setup allows for that.
 1. Authentication, companies, members and roles
 2. Web shell, design system and settings
 3. Inventory (spools and lots, stock ledger) and expenses
-4. Catalog and customers · 4b public showcase · 4c seasonal showcases (this part)
-5. Calculator
+4. Catalog and customers · 4b public showcase · 4c seasonal showcases
+5. Calculator (this part)
 6. Quotes and PDF
 7. Orders and Kanban, stock consumption
 8. Sales and profit

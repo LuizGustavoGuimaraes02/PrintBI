@@ -11,3 +11,5 @@ export * from './schemas/settings';
 export * from './views';
 export * from './schemas/catalog';
 export * from './schemas/showcase';
+export * from './calculator';
+export * from './schemas/calculator';

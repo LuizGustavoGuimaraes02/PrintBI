@@ -11,6 +11,7 @@ import { apiRateLimit } from './core/auth/rate-limit';
 import { errorHandler, notFoundHandler } from './core/http/error-handler';
 import { logger } from './core/logger';
 import { authRouter } from './modules/auth/auth.routes';
+import { calculationsRouter } from './modules/calculations/calculations.routes';
 import { companiesRouter } from './modules/companies/companies.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { customerSourcesRouter } from './modules/customer-sources/customer-sources.routes';
@@ -72,6 +73,7 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/customers', customersRouter);
   api.use('/customer-sources', customerSourcesRouter);
   api.use('/uploads', uploadsRouter);
+  api.use('/calculations', calculationsRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
