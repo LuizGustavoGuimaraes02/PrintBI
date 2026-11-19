@@ -10,20 +10,12 @@ interface LotFieldsProps {
   form: UseFormReturn<InventoryForm>;
   kind: ItemKind;
   unit: string;
-  canSeeFinance: boolean;
   canManageFinance: boolean;
   categories: CategoryView[];
 }
 
 /** One physical roll or purchase lot: quantity, what is left, price and the optional expense. */
-export function LotFields({
-  form,
-  kind,
-  unit,
-  canSeeFinance,
-  canManageFinance,
-  categories,
-}: LotFieldsProps) {
+export function LotFields({ form, kind, unit, canManageFinance, categories }: LotFieldsProps) {
   const { register, control, setValue, formState } = form;
   const errors = formState.errors.lot;
   const lot = useWatch({ control, name: 'lot' });
@@ -81,7 +73,7 @@ export function LotFields({
 
       {filament && <RollWarningField form={form} />}
 
-      {canSeeFinance && (
+      {
         <div className="grid gap-5 sm:grid-cols-[1fr_120px]">
           <TextField
             label="Price paid"
@@ -102,7 +94,7 @@ export function LotFields({
             <option value="BRL">BRL</option>
           </SelectField>
         </div>
-      )}
+      }
 
       <div className="grid gap-5 sm:grid-cols-2">
         <TextField

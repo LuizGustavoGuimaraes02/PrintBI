@@ -142,14 +142,21 @@ describe('multi-color purchases', () => {
     expect(unpriced.status).toBe(400);
   });
 
-  it('only members with financial access register filament, always with a price', async () => {
+  it('any member registers filament with its price; only finance records the expense', async () => {
     const admin = await registerWithCompany(app);
     const employee = await addEmployee(app, admin.client, false);
-    expect((await purchase(employee.client, { lines: [line('black', 'Black')] })).status).toBe(403);
+    const priced = await purchase(employee.client, { lines: [line('black', 'Black')] });
+    expect(priced.status).toBe(201);
+    expect(priced.body[0].lots[0].unitCost).toBeNull(); // entered, but not shown back
     expect(
-      (await purchase(employee.client, { lines: [line('black', 'Black', 1, { totalCost: null })] }))
+      (await purchase(employee.client, { lines: [line('white', 'White', 1, { totalCost: null })] }))
         .status,
-    ).toBe(403);
+    ).toBe(400);
+    const withExpense = await purchase(employee.client, {
+      lines: [line('black', 'Black')],
+      expense: { categoryId: await filamentCategory(admin.client) },
+    });
+    expect(withExpense.status).toBe(403);
 
     const unpriced = await purchase(admin.client, {
       lines: [line('black', 'Black'), line('white', 'White', 1, { totalCost: null })],

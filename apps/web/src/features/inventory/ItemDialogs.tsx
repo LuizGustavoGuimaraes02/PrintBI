@@ -47,7 +47,6 @@ interface ItemDialogProps {
 export function AddLotDialog({ item, onClose }: ItemDialogProps) {
   const toast = useToast();
   const refresh = useRefreshInventory();
-  const canSeeFinance = useCan('finance:view');
   const canManageFinance = useCan('finance:manage');
   const idempotency = useIdempotencyKey();
   const { data: settings } = useSettings();
@@ -69,7 +68,7 @@ export function AddLotDialog({ item, onClose }: ItemDialogProps) {
 
   const submit = handleSubmit(async (values) => {
     const payload = toLotPayload(values.lot, {
-      withCosts: canSeeFinance,
+      withCosts: true,
       withExpense: canManageFinance,
     });
     const toFormPath = (p: string) => formPath(`lot.${p}`, 'lot');
@@ -107,7 +106,6 @@ export function AddLotDialog({ item, onClose }: ItemDialogProps) {
           form={form}
           kind={item.kind}
           unit={unitLabel(item)}
-          canSeeFinance={canSeeFinance}
           canManageFinance={canManageFinance}
           categories={categories}
         />

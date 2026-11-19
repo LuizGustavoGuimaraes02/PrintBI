@@ -350,7 +350,7 @@ describe('corrections', () => {
 });
 
 describe('permissions and isolation', () => {
-  it('employees without financial access see no costs and cannot set them, but can record usage', async () => {
+  it('employees without financial access enter prices when registering, but never see costs', async () => {
     const admin = await registerWithCompany(app);
     const item = await createSpool(admin.client);
     const employee = await addEmployee(app, admin.client, false);
@@ -365,7 +365,14 @@ describe('permissions and isolation', () => {
       { originalQuantity: '1000', remaining: '1000', totalCost: CAD('25') },
       { 'Idempotency-Key': newKey() },
     );
-    expect(withCost.status).toBe(403);
+    expect(withCost.status).toBe(201);
+    // The roll was priced, but the employee's view still hides it.
+    expect(withCost.body.lots[1].unitCost).toBeNull();
+    const asAdmin = (await admin.client.get(`/api/v1/inventory/items/${item.id}`)).body;
+    expect(asAdmin.lots[1].unitCost).toEqual({ amount: 25_000, currency: 'CAD' });
+    // Changing a recorded price stays with financial access.
+    const lotUrl = `/api/v1/inventory/items/${item.id}/lots/${item.lots[0]?.id}`;
+    expect((await employee.client.patch(lotUrl, { totalCost: CAD('30') })).status).toBe(403);
     expect(
       (
         await consume(employee.client, [

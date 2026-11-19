@@ -311,25 +311,17 @@ async function definition(input: ItemInput) {
   };
 }
 
+/**
+ * Any member may enter the price of what they register (they are the ones holding the
+ * receipt); seeing costs afterwards still needs financial access, and so does an expense.
+ */
 function assertMayRecordCosts(actor: Actor, lot: LotInput) {
-  if (lot.totalCost && !actor.canSeeFinance)
-    throw new ForbiddenError('You cannot record costs without financial access');
   if (lot.expense && !actor.canManageFinance)
     throw new ForbiddenError('You cannot record expenses without financial access');
 }
 
-/**
- * Filament rolls always carry their price, so every gram used has a real cost. Registering
- * filament is therefore limited to members with financial access.
- */
-function assertFilamentPriced(
-  actor: Actor,
-  lot: { totalCost: LotInput['totalCost'] },
-  path = 'totalCost',
-) {
-  if (!actor.canSeeFinance) {
-    throw new ForbiddenError('Only members with financial access can register filament rolls');
-  }
+/** Filament rolls always carry their price, so every gram used has a real cost. */
+function assertFilamentPriced(lot: { totalCost: LotInput['totalCost'] }, path = 'totalCost') {
   if (!lot.totalCost) {
     throw new ValidationError('Some fields are invalid', [
       { path, message: 'Enter the price paid for the roll' },
@@ -476,8 +468,7 @@ export async function createItem(
 ): Promise<{ item: InventoryItemView; replayed: boolean }> {
   if (input.firstLot) {
     assertMayRecordCosts(actor, input.firstLot);
-    if (input.item.kind === 'filament')
-      assertFilamentPriced(actor, input.firstLot, 'firstLot.totalCost');
+    if (input.item.kind === 'filament') assertFilamentPriced(input.firstLot, 'firstLot.totalCost');
   }
   const fields = await definition(input.item);
 
@@ -568,7 +559,7 @@ export async function addLot(
 ): Promise<{ item: InventoryItemView; replayed: boolean }> {
   assertMayRecordCosts(actor, lot);
   const existing = await loadItem(actor.companyId, itemId);
-  if (existing.kind === 'filament') assertFilamentPriced(actor, lot);
+  if (existing.kind === 'filament') assertFilamentPriced(lot);
   const { replayed } = await runOnce(
     actor.companyId,
     key,
@@ -951,9 +942,6 @@ export async function recordPurchase(
   input: PurchaseInput,
   key: string,
 ): Promise<{ items: InventoryItemView[]; replayed: boolean }> {
-  const anyCost = input.lines.some((l) => l.totalCost);
-  if (anyCost && !actor.canSeeFinance)
-    throw new ForbiddenError('You cannot record costs without financial access');
   if (input.expense && !actor.canManageFinance) {
     throw new ForbiddenError('You cannot record expenses without financial access');
   }
@@ -972,7 +960,7 @@ export async function recordPurchase(
   );
   input.lines.forEach((line, index) => {
     const kind = line.item?.kind ?? (line.itemId ? existingKinds.get(line.itemId) : undefined);
-    if (kind === 'filament') assertFilamentPriced(actor, line, `lines.${index}.totalCost`);
+    if (kind === 'filament') assertFilamentPriced(line, `lines.${index}.totalCost`);
   });
 
   const { result, replayed } = await runOnce(

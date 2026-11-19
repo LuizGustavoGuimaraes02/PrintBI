@@ -13,7 +13,6 @@ import { useNavigate } from 'react-router';
 import {
   Button,
   cn,
-  EmptyState,
   Notice,
   PageHeader,
   PageLoader,
@@ -53,7 +52,6 @@ export function NewItemPage() {
   const { data: categories } = useCategories();
   const { data: products } = useFilamentProducts();
   const [kind, setKind] = useState<ItemKind>('filament');
-  const canSeeFinance = useCan('finance:view');
   if (!settings || !categories || !products) return <PageLoader />;
   const currency = settings.currency.defaultCurrency;
 
@@ -84,12 +82,7 @@ export function NewItemPage() {
           </button>
         ))}
       </div>
-      {kind === 'filament' && !canSeeFinance ? (
-        <EmptyState title="Filament needs financial access">
-          Every roll is registered with the price paid, so only members with financial access can
-          add filament. You can still add other consumables and record filament usage.
-        </EmptyState>
-      ) : kind === 'filament' ? (
+      {kind === 'filament' ? (
         <FilamentPurchase currency={currency} categories={categories} products={products} />
       ) : (
         <SingleItemForm
@@ -116,7 +109,6 @@ function SingleItemForm({ kind, currency, categories, products }: SingleItemForm
   const navigate = useNavigate();
   const toast = useToast();
   const refresh = useRefreshInventory();
-  const canSeeFinance = useCan('finance:view');
   const canManageFinance = useCan('finance:manage');
   const idempotency = useIdempotencyKey();
 
@@ -138,7 +130,7 @@ function SingleItemForm({ kind, currency, categories, products }: SingleItemForm
       const payload = {
         item: toItemPayload(values.item),
         firstLot: values.hasStock
-          ? toLotPayload(values.lot, { withCosts: canSeeFinance, withExpense: canManageFinance })
+          ? toLotPayload(values.lot, { withCosts: true, withExpense: canManageFinance })
           : null,
       };
       if (!checkPayload(createItemSchema, payload, setError, (p) => formPath(p))) return;
@@ -180,7 +172,6 @@ function SingleItemForm({ kind, currency, categories, products }: SingleItemForm
             form={form}
             kind={kind}
             unit={unitLabel({ unit, customUnit })}
-            canSeeFinance={canSeeFinance}
             canManageFinance={canManageFinance}
             categories={categories}
           />

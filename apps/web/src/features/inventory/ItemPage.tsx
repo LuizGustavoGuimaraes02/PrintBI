@@ -171,11 +171,9 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
           <Button onClick={() => setDialog({ kind: 'consume' })} disabled={item.remaining === 0}>
             Record usage
           </Button>
-          {(!filament || canSeeFinance) && (
-            <Button variant="soft" onClick={() => setDialog({ kind: 'addLot' })}>
-              {filament ? 'Add roll' : 'Add stock'}
-            </Button>
-          )}
+          <Button variant="soft" onClick={() => setDialog({ kind: 'addLot' })}>
+            {filament ? 'Add roll' : 'Add stock'}
+          </Button>
           <Button variant="ghost" onClick={() => setDialog({ kind: 'edit' })}>
             Edit
           </Button>
@@ -255,11 +253,9 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
           <EmptyState
             title="No stock yet"
             action={
-              (!filament || canSeeFinance) && (
-                <Button onClick={() => setDialog({ kind: 'addLot' })}>
-                  {filament ? 'Add a roll' : 'Add stock'}
-                </Button>
-              )
+              <Button onClick={() => setDialog({ kind: 'addLot' })}>
+                {filament ? 'Add a roll' : 'Add stock'}
+              </Button>
             }
           >
             Add what you have on the shelf to start tracking it.
