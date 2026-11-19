@@ -75,7 +75,8 @@ describe('LabelPicker', () => {
     const calls = mockApi();
     const onChange = vi.fn();
     renderWithApp(<Harness onChange={onChange} />);
-    await userEvent.type(screen.getByLabelText('New label'), 'Vase{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'New label' }));
+    await userEvent.type(screen.getByLabelText('Label name'), 'Vase{Enter}');
     await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(['ccccccccccccccccccccccc1']));
     const post = calls.find((c) => c.init.method === 'POST');
     expect(JSON.parse(String(post?.init.body))).toEqual({ name: 'Vase', color: '#FEF0E6' });
@@ -85,7 +86,8 @@ describe('LabelPicker', () => {
     const calls = mockApi();
     const onChange = vi.fn();
     renderWithApp(<Harness onChange={onChange} />);
-    await userEvent.type(screen.getByLabelText('New label'), 'keychain');
+    await userEvent.click(screen.getByRole('button', { name: 'New label' }));
+    await userEvent.type(screen.getByLabelText('Label name'), 'keychain');
     await userEvent.click(screen.getByRole('button', { name: 'Add label' }));
     expect(onChange).toHaveBeenLastCalledWith(['aaaaaaaaaaaaaaaaaaaaaaa1']);
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);

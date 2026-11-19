@@ -171,3 +171,39 @@ inventoryRouter.post('/purchases', async (req, res) => {
   const { items, replayed } = await service.recordPurchase(actor(req), input, idempotencyKey(req));
   created(res, replayed, items);
 });
+
+/** Deleting fixes a mistake; `expenses=delete` also removes expenses that paid only for it. */
+const deleteQuery = z.object({
+  expenses: z.enum(['delete', 'keep']).default('keep'),
+  lotId: objectIdSchema.optional(),
+});
+const deleting = requirePermission('records:archive');
+
+inventoryRouter.get('/items/:itemId/delete-preview', deleting, async (req, res) => {
+  const { lotId } = parseInput(deleteQuery, req.query);
+  res.json(
+    await service.stockDeletePreview(
+      actor(req),
+      id(req.params.itemId),
+      lotId ? new Types.ObjectId(lotId) : null,
+    ),
+  );
+});
+
+inventoryRouter.delete('/items/:itemId', deleting, async (req, res) => {
+  const { expenses } = parseInput(deleteQuery, req.query);
+  await service.deleteStock(actor(req), id(req.params.itemId), null, expenses === 'delete');
+  res.status(204).end();
+});
+
+inventoryRouter.delete('/items/:itemId/lots/:lotId', deleting, async (req, res) => {
+  const { expenses } = parseInput(deleteQuery, req.query);
+  res.json(
+    await service.deleteStock(
+      actor(req),
+      id(req.params.itemId),
+      id(req.params.lotId),
+      expenses === 'delete',
+    ),
+  );
+});

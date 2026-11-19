@@ -9,7 +9,7 @@ import type {
   paymentInputSchema,
   updateExpenseSchema,
 } from '@printbi/shared';
-import { Types, type ClientSession } from 'mongoose';
+import mongoose, { Types, type ClientSession } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
 import { AppError, NotFoundError, ValidationError } from '../../core/errors';
@@ -441,4 +441,39 @@ export async function expenseSummary(
         }
       : null,
   };
+}
+
+/**
+ * Deletes an expense entered by mistake, with its payments. Rolls it paid for stay in stock,
+ * unlinked, and show again under "not recorded in expenses". A real expense that was called
+ * off is cancelled instead, so it stays in the history.
+ */
+export async function deleteExpense(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+  id: Types.ObjectId,
+): Promise<void> {
+  await mongoose.connection.transaction(async (session) => {
+    const expense = await ExpenseModel.findOneAndDelete(
+      { _id: id, companyId },
+      { session, projection: { description: 1 } },
+    ).lean();
+    if (!expense) throw new NotFoundError('Expense');
+    await InventoryItemModel.updateMany(
+      { companyId, 'lots.expenseId': id },
+      { $set: { 'lots.$[lot].expenseId': null } },
+      { session, arrayFilters: [{ 'lot.expenseId': id }] },
+    );
+    await audit(
+      {
+        companyId,
+        actorId,
+        action: 'expense.deleted',
+        entity: 'expense',
+        entityId: id,
+        reason: expense.description,
+      },
+      session,
+    );
+  });
 }

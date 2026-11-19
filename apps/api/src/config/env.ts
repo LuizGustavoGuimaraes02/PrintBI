@@ -21,6 +21,30 @@ const envSchema = z.object({
   SESSION_IDLE_MINUTES: z.coerce.number().int().positive().default(30),
   /** Max requests per IP per 15 minutes on sensitive auth routes. */
   AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(20),
+  /**
+   * Image storage, as shown on the Cloudinary dashboard: cloudinary://<api_key>:<api_secret>@<cloud_name>.
+   * Optional: without it the app runs and photo uploads stay disabled.
+   */
+  CLOUDINARY_URL: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return null;
+      const match = /^cloudinary:\/\/([^:]+):([^@]+)@([\w-]+)$/.exec(value);
+      if (!match) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Use cloudinary://<api_key>:<api_secret>@<cloud_name>',
+        });
+        return z.NEVER;
+      }
+      const [, apiKey = '', apiSecret = '', cloudName = ''] = match;
+      return { apiKey, apiSecret, cloudName };
+    }),
+  /** Overridable for local testing against a stand-in server. */
+  CLOUDINARY_API_BASE: z.url().default('https://api.cloudinary.com'),
+  CLOUDINARY_DELIVERY_BASE: z.url().default('https://res.cloudinary.com'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

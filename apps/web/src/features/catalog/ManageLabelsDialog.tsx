@@ -1,6 +1,6 @@
 import type { LabelView } from '@printbi/shared';
 import { useState } from 'react';
-import { Button, cn, Modal, useToast } from '../../design-system';
+import { Button, cn, InlineDelete, Modal, useToast } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
 import { LabelChip, LabelColorChoice } from './LabelPicker';
 import { useLabels, useRefreshCatalog } from './queries';
@@ -52,6 +52,7 @@ function useUpdateLabel(label: LabelView) {
 function LabelRow({ label, onEdit }: { label: LabelView; onEdit: () => void }) {
   const toast = useToast();
   const update = useUpdateLabel(label);
+  const refresh = useRefreshCatalog();
   const [busy, setBusy] = useState(false);
   const toggleArchived = async () => {
     setBusy(true);
@@ -75,6 +76,24 @@ function LabelRow({ label, onEdit }: { label: LabelView; onEdit: () => void }) {
       <Button variant="ghost" size="sm" loading={busy} onClick={() => void toggleArchived()}>
         {label.archived ? 'Restore' : 'Archive'}
       </Button>
+      <InlineDelete
+        name={label.name}
+        consequence={
+          label.productCount > 0
+            ? `It comes off ${label.productCount} ${label.productCount === 1 ? 'product' : 'products'}.`
+            : undefined
+        }
+        onDelete={async () => {
+          try {
+            await api.delete(`/labels/${label.id}`);
+            await refresh();
+            toast.success('Label deleted', label.name);
+          } catch (e) {
+            toast.error('Not deleted', e instanceof ApiError ? e.message : undefined);
+            throw e;
+          }
+        }}
+      />
     </li>
   );
 }

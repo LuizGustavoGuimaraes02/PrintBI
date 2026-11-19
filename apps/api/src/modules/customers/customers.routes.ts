@@ -71,3 +71,9 @@ customersRouter.post(
     );
   },
 );
+
+customersRouter.delete('/:customerId', requirePermission('records:archive'), async (req, res) => {
+  const auth = getCompanyAuth(req);
+  await service.deleteCustomer(auth.companyId, auth.userId, id(req.params.customerId));
+  res.status(204).end();
+});

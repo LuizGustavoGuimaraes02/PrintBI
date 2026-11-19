@@ -10,3 +10,4 @@ export * from './schemas/inventory';
 export * from './schemas/settings';
 export * from './views';
 export * from './schemas/catalog';
+export * from './schemas/showcase';

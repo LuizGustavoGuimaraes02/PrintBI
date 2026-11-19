@@ -68,3 +68,33 @@ function ExtrudingDots() {
     </span>
   );
 }
+
+interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Spoken and shown as a tooltip: icon buttons have no visible text. */
+  label: string;
+  children: ReactNode;
+}
+
+/** A round, solid icon button that stays visible on photos and busy rows. */
+export function IconButton({
+  label,
+  children,
+  className,
+  type = 'button',
+  ...rest
+}: IconButtonProps) {
+  return (
+    <button
+      type={type}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'flex size-9 shrink-0 items-center justify-center rounded-full border border-rule-soft bg-surface text-ink shadow-sm transition-colors hover:bg-teal-soft hover:text-teal-ink disabled:pointer-events-none disabled:opacity-35',
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}

@@ -187,7 +187,7 @@ export function PrintersPage() {
   const archive = useSaving(
     (id: string) => api.delete(`${companyBase}/printers/${id}`),
     [keys.printers],
-    'Printer archived',
+    'Printer deleted',
   );
 
   if (!printers) return <PageLoader />;
@@ -195,7 +195,7 @@ export function PrintersPage() {
   return (
     <Panel
       title="Printers"
-      description="Assign jobs to a printer and price machine time. Archived printers stay on past orders."
+      description="Assign jobs to a printer and price machine time."
       actions={
         canManage && (
           <Button
@@ -266,8 +266,13 @@ export function PrintersPage() {
                       <Button size="sm" variant="soft" onClick={() => setEditing(printer)}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setArchiving(printer)}>
-                        Archive
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+                        onClick={() => setArchiving(printer)}
+                      >
+                        Delete
                       </Button>
                     </>
                   )}
@@ -295,9 +300,10 @@ export function PrintersPage() {
       <ConfirmDialog
         open={archiving !== null}
         onOpenChange={(open) => !open && setArchiving(null)}
-        title={`Archive ${archiving?.name ?? ''}?`}
-        description="It disappears from new jobs and calculations. Past orders keep showing it."
-        confirmLabel="Archive printer"
+        title={`Delete ${archiving?.name ?? ''}?`}
+        description="It is removed from your printers, with its costs. Add it again any time."
+        confirmLabel="Delete printer"
+        tone="danger"
         loading={archive.isPending}
         onConfirm={() =>
           archiving && archive.mutate(archiving.id, { onSettled: () => setArchiving(null) })

@@ -4,11 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
-import { Button, ImageSlot, Notice, PageLoader, Panel, TextField } from '../../design-system';
+import { Button, Notice, PageLoader, Panel, TextField } from '../../design-system';
 import { api } from '../../lib/api';
 import { applyServerErrors } from '../../lib/forms';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
 import { accountKey, useCan } from '../auth/account';
+import { LogoField } from './LogoField';
 import { companyBase, keys, useCompany, useSaving } from './queries';
 
 type ProfileForm = z.input<typeof updateCompanyProfileSchema>;
@@ -110,11 +111,7 @@ function BusinessForm({ company }: { company: CompanyView }) {
               {...register('social')}
             />
           </div>
-          <ImageSlot label="Logo" size="512 × 512" formats="PNG, SVG or WebP · up to 1 MB">
-            <p className="max-w-56 text-xs text-ink-muted">
-              Logo upload arrives with image storage in Part 4b.
-            </p>
-          </ImageSlot>
+          <LogoField company={company} />
         </fieldset>
         {errors.root?.server && (
           <Notice tone="attention" title="Not saved">

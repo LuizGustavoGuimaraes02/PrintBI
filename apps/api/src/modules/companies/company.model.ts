@@ -1,4 +1,12 @@
-import { PRINTER_STATUSES, RISK_BASES, ROLES, CURRENCIES, toMicro } from '@printbi/shared';
+import {
+  CURRENCIES,
+  PRINTER_STATUSES,
+  RISK_BASES,
+  ROLES,
+  SHOWCASE_LANGUAGES,
+  toMicro,
+} from '@printbi/shared';
+import { imageSchema } from '../../core/db-schemas/image.schema';
 import { microField, moneySchema } from '../../core/db-schemas/money.schema';
 import { model, Schema, type HydratedDocument, type InferSchemaType } from 'mongoose';
 
@@ -130,6 +138,17 @@ const companySchema = new Schema(
     address: { type: String, trim: true },
     website: { type: String, trim: true },
     social: { type: String, trim: true },
+    /** Public link name: /s/<slug>. Unique across businesses. */
+    slug: { type: String, default: null },
+    logo: { type: imageSchema, default: null },
+    showcase: {
+      published: { type: Boolean, default: false },
+      title: { type: String, default: '' },
+      description: { type: String, default: '' },
+      language: { type: String, enum: SHOWCASE_LANGUAGES, default: 'pt-BR' },
+      whatsapp: { type: String, default: '' },
+      messageTemplate: { type: String, default: '' },
+    },
     settings: { type: settingsSchema, default: () => ({}) },
     printers: { type: [printerSchema], default: [] },
     labels: { type: [labelSchema], default: [] },
@@ -145,6 +164,10 @@ const companySchema = new Schema(
 );
 
 companySchema.index({ 'invites.tokenHash': 1 }, { sparse: true });
+companySchema.index(
+  { slug: 1 },
+  { unique: true, partialFilterExpression: { slug: { $type: 'string' } } },
+);
 
 export type Company = InferSchemaType<typeof companySchema>;
 export type CompanyDocument = HydratedDocument<Company>;

@@ -1,6 +1,7 @@
 import {
   createCompanySchema,
   objectIdSchema,
+  registerImageSchema,
   updateCompanyProfileSchema,
   updateMemberSchema,
 } from '@printbi/shared';
@@ -49,4 +50,15 @@ export const removeMember: RequestHandler = async (req, res) => {
   const auth = getCompanyAuth(req);
   await service.removeMember(auth.companyId, auth.userId, userIdParam(req));
   res.status(204).end();
+};
+
+export const setLogo: RequestHandler = async (req, res) => {
+  const auth = getCompanyAuth(req);
+  const { publicId } = parseInput(registerImageSchema, req.body);
+  res.json(await service.setCompanyLogo(auth.companyId, auth.userId, publicId));
+};
+
+export const removeLogo: RequestHandler = async (req, res) => {
+  const auth = getCompanyAuth(req);
+  res.json(await service.removeCompanyLogo(auth.companyId, auth.userId));
 };

@@ -13,6 +13,7 @@ import {
   type recordLotExpensesSchema,
   type UnrecordedLotView,
   type Money,
+  type StockDeletePreviewView,
   type StockMovementView,
   type updateLotSchema,
 } from '@printbi/shared';
@@ -28,6 +29,7 @@ import {
 } from '../../core/errors';
 import { isDuplicateKey } from '../../core/http/idempotency';
 import { CompanyModel } from '../companies/company.model';
+import { ExpenseModel } from '../expenses/expense.model';
 import { createExpense } from '../expenses/expenses.service';
 import { filamentProductExists } from '../filament-catalog/filament-catalog.service';
 import { UserModel } from '../users/user.model';
@@ -1228,4 +1230,154 @@ export async function recordLotExpenses(
     if (isDuplicateKey(error)) throw new ConflictError('Some of these rolls were just recorded');
     throw error;
   }
+}
+
+// ---- Deleting (to fix mistakes) -------------------------------------------------------------
+
+interface StockTarget {
+  item: ItemRecord;
+  lotIds: Types.ObjectId[];
+  /** Null when the whole item goes. */
+  lotId: Types.ObjectId | null;
+}
+
+async function stockTarget(
+  actor: Actor,
+  itemId: Types.ObjectId,
+  lotId: Types.ObjectId | null,
+  session?: ClientSession,
+): Promise<StockTarget> {
+  const item = await loadItem(actor.companyId, itemId, session);
+  if (lotId && !item.lots.some((lot) => lot._id.equals(lotId))) throw new NotFoundError('Roll');
+  return { item, lotId, lotIds: lotId ? [lotId] : item.lots.map((lot) => lot._id) };
+}
+
+/** Expenses that paid for the target rolls, and whether each also pays for rolls that stay. */
+async function linkedExpenses(actor: Actor, target: StockTarget, session?: ClientSession) {
+  if (target.lotIds.length === 0) return [];
+  const going = new Set(target.lotIds.map(String));
+  const rows = await ExpenseModel.find(
+    { companyId: actor.companyId, 'stock.lotId': { $in: target.lotIds } },
+    { description: 1, amount: 1, stock: 1 },
+    { session },
+  ).lean();
+  return rows.map((expense) => ({
+    expense,
+    shared: expense.stock.some((s) => !going.has(s.lotId.toString())),
+  }));
+}
+
+/**
+ * Movements tied to an order or a sale are part of that record's history: such stock is
+ * archived, not deleted. (Orders and sales arrive in later parts; the check is ready.)
+ */
+async function assertNotUsedByOrders(actor: Actor, target: StockTarget, session?: ClientSession) {
+  const used = await StockMovementModel.exists({
+    companyId: actor.companyId,
+    itemId: target.item._id,
+    lotId: { $in: target.lotIds },
+    $or: [{ orderId: { $ne: null } }, { saleId: { $ne: null } }],
+  }).session(session ?? null);
+  if (used) {
+    throw new ConflictError('This stock was used by orders or sales. Archive it instead.');
+  }
+}
+
+export async function stockDeletePreview(
+  actor: Actor,
+  itemId: Types.ObjectId,
+  lotId: Types.ObjectId | null,
+): Promise<StockDeletePreviewView> {
+  const target = await stockTarget(actor, itemId, lotId);
+  const [movements, expenses] = await Promise.all([
+    StockMovementModel.countDocuments({
+      companyId: actor.companyId,
+      itemId,
+      lotId: { $in: target.lotIds },
+    }),
+    linkedExpenses(actor, target),
+  ]);
+  return {
+    lots: target.lotIds.length,
+    movements,
+    linkedExpenseCount: expenses.length,
+    expenses: actor.canSeeFinance
+      ? expenses.map(({ expense, shared }) => ({
+          id: expense._id.toString(),
+          description: expense.description,
+          amount: { amount: expense.amount.amount, currency: expense.amount.currency },
+          shared,
+        }))
+      : [],
+  };
+}
+
+/**
+ * Deletes a stock item, or one of its rolls, entered by mistake: the rolls, their ledger rows
+ * and, when asked, the expenses that paid only for them. An expense that also paid for rolls
+ * that stay is unlinked from the deleted ones and kept. All in one transaction.
+ */
+export async function deleteStock(
+  actor: Actor,
+  itemId: Types.ObjectId,
+  lotId: Types.ObjectId | null,
+  deleteExpenses: boolean,
+): Promise<InventoryItemView | null> {
+  // Deleting money records needs the right to manage money.
+  const removeExpenses = deleteExpenses && actor.canManageFinance;
+  await mongoose.connection.transaction(async (session) => {
+    const target = await stockTarget(actor, itemId, lotId, session);
+    await assertNotUsedByOrders(actor, target, session);
+    for (const { expense, shared } of await linkedExpenses(actor, target, session)) {
+      if (removeExpenses && !shared) {
+        await ExpenseModel.deleteOne({ _id: expense._id, companyId: actor.companyId }, { session });
+        await audit(
+          {
+            companyId: actor.companyId,
+            actorId: actor.userId,
+            action: 'expense.deleted',
+            entity: 'expense',
+            entityId: expense._id,
+            reason: `With stock: ${target.item.name}`,
+          },
+          session,
+        );
+      } else {
+        await ExpenseModel.updateOne(
+          { _id: expense._id, companyId: actor.companyId },
+          { $pull: { stock: { lotId: { $in: target.lotIds } } } },
+          { session },
+        );
+      }
+    }
+    await StockMovementModel.deleteMany(
+      { companyId: actor.companyId, itemId, lotId: { $in: target.lotIds } },
+      { session },
+    );
+    if (lotId) {
+      await InventoryItemModel.updateOne(
+        { _id: itemId, companyId: actor.companyId },
+        { $pull: { lots: { _id: lotId } } },
+        { session },
+      );
+    } else {
+      // Rows of rolls deleted earlier are gone already; this catches any stray ones.
+      await StockMovementModel.deleteMany({ companyId: actor.companyId, itemId }, { session });
+      await InventoryItemModel.deleteOne({ _id: itemId, companyId: actor.companyId }, { session });
+    }
+    await audit(
+      {
+        companyId: actor.companyId,
+        actorId: actor.userId,
+        action: lotId ? 'inventory.lot_deleted' : 'inventory.item_deleted',
+        entity: 'inventory_item',
+        entityId: itemId,
+        reason: lotId
+          ? `${target.item.name} · ${target.item.lots.find((l) => l._id.equals(lotId))?.label ?? ''}`
+          : target.item.name,
+      },
+      session,
+    );
+  });
+  return lotId ? getItem(actor, itemId) : null;
 }

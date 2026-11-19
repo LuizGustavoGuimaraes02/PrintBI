@@ -30,6 +30,6 @@ printersRouter.put('/:printerId', requirePermission('settings:manage'), async (r
 
 printersRouter.delete('/:printerId', requirePermission('settings:manage'), async (req, res) => {
   const auth = getCompanyAuth(req);
-  await service.archivePrinter(auth.companyId, auth.userId, printerId(req));
+  await service.deletePrinter(auth.companyId, auth.userId, printerId(req));
   res.status(204).end();
 });

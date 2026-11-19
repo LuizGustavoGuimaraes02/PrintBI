@@ -6,6 +6,8 @@ import type {
   MemberView,
   PrinterModelView,
   PrinterView,
+  ProductView,
+  ShowcaseSettingsView,
 } from '@printbi/shared';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useToast } from '../../design-system';
@@ -21,10 +23,22 @@ export const keys = {
   printers: ['printers'] as const,
   categories: ['categories'] as const,
   printerModels: ['printer-models'] as const,
+  showcase: ['showcase'] as const,
+  showcaseProducts: ['showcase', 'products'] as const,
 };
 
 export const useCompany = () =>
   useQuery({ queryKey: keys.company, queryFn: () => api.get<CompanyView>(base) });
+export const useShowcaseSettings = () =>
+  useQuery({
+    queryKey: keys.showcase,
+    queryFn: () => api.get<ShowcaseSettingsView>(`${base}/showcase`),
+  });
+export const useShowcaseProducts = () =>
+  useQuery({
+    queryKey: keys.showcaseProducts,
+    queryFn: () => api.get<ProductView[]>(`${base}/showcase/products`),
+  });
 export const useSettings = () =>
   useQuery({
     queryKey: keys.settings,

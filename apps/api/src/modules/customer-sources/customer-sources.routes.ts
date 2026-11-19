@@ -29,3 +29,10 @@ customerSourcesRouter.patch('/:sourceId', async (req, res) => {
   const input = parseInput(updateCustomerSourceSchema, req.body);
   res.json(await service.updateSource(auth.companyId, auth.userId, sourceId, input));
 });
+
+customerSourcesRouter.delete('/:sourceId', async (req, res) => {
+  const auth = getCompanyAuth(req);
+  const sourceId = new Types.ObjectId(parseInput(objectIdSchema, req.params.sourceId));
+  await service.deleteSource(auth.companyId, auth.userId, sourceId);
+  res.status(204).end();
+});

@@ -18,6 +18,7 @@ const inventory = () => import('../features/inventory/pages');
 const expenses = () => import('../features/expenses/pages');
 const catalog = () => import('../features/catalog/pages');
 const customers = () => import('../features/customers/pages');
+const showcase = () => import('../features/showcase/pages');
 
 const placeholders: RouteObject[] = NAV_ITEMS.filter((item) => item.part).map((item) => ({
   path: item.to.slice(1),
@@ -25,6 +26,9 @@ const placeholders: RouteObject[] = NAV_ITEMS.filter((item) => item.part).map((i
 }));
 
 export const routes: RouteObject[] = [
+  // Public showcase: no account, no session handling.
+  { path: '/s/:companySlug', ...page(showcase, 'PublicShowcasePage') },
+  { path: '/s/:companySlug/:productSlug', ...page(showcase, 'PublicProductPage') },
   {
     element: <SessionWatcher />,
     children: [
@@ -60,6 +64,7 @@ export const routes: RouteObject[] = [
               { path: 'products', ...page(catalog, 'ProductsPage') },
               { path: 'products/new', ...page(catalog, 'NewProductPage') },
               { path: 'products/:productId', ...page(catalog, 'ProductPage') },
+              { path: 'showcase', ...page(settings, 'ShowcasePage') },
               { path: 'customers', ...page(customers, 'CustomersPage') },
               { path: 'customers/:customerId', ...page(customers, 'CustomerPage') },
               {
@@ -69,6 +74,7 @@ export const routes: RouteObject[] = [
                   { index: true, element: <Navigate to="business" replace /> },
                   { path: 'business', ...page(settings, 'BusinessPage') },
                   { path: 'team', ...page(settings, 'TeamPage') },
+                  { path: 'showcase', element: <Navigate to="/showcase" replace /> },
                   { path: 'currency', ...page(settings, 'CurrencyPage') },
                   { path: 'calculator', ...page(settings, 'CalculatorDefaultsPage') },
                   { path: 'printers', ...page(settings, 'PrintersPage') },

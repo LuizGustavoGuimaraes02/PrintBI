@@ -25,6 +25,7 @@ export interface CompanyView {
   address: string;
   website: string;
   social: string;
+  logo: ImageView | null;
 }
 
 export interface MemberView {
@@ -331,6 +332,9 @@ export interface ProductView {
     filamentGrams: number | null;
   };
   notes: string;
+  /** Photos in display order; the first is the cover. */
+  images: ImageView[];
+  showcase: ProductShowcaseView;
   archived: boolean;
   /** Units sold so far; filled once sales exist. */
   soldQuantity: number;
@@ -372,4 +376,123 @@ export interface CustomerSourceView {
   archived: boolean;
   /** Active customers who came from this source. */
   customerCount: number;
+}
+
+/** An uploaded image with ready-made sizes (Cloudinary picks the best format per browser). */
+export interface ImageView {
+  id: string;
+  width: number;
+  height: number;
+  alt: string;
+  urls: {
+    /** Square crop, 400 px: lists and grids. */
+    thumb: string;
+    /** Square crop, 800 px: showcase cards. */
+    card: string;
+    /** Whole image, up to 1600 px: galleries. */
+    full: string;
+  };
+}
+
+export interface ProductShowcaseView {
+  visible: boolean;
+  badge: 'ready' | 'made_to_order';
+  showPrice: boolean;
+  featured: boolean;
+  /** Position among visible products; lower comes first. */
+  order: number;
+  /** Part of the public product link; set the first time the product is shown. */
+  slug: string | null;
+}
+
+export interface UploadConfigView {
+  /** False until Cloudinary credentials are configured on the API. */
+  enabled: boolean;
+}
+
+/** Everything the browser sends to Cloudinary for one signed upload. */
+export interface UploadSignatureView {
+  uploadUrl: string;
+  publicId: string;
+  fields: Record<string, string>;
+  maxBytes: number;
+  formats: readonly string[];
+}
+
+export interface ShowcaseSettingsView {
+  published: boolean;
+  slug: string;
+  title: string;
+  description: string;
+  language: 'en' | 'pt-BR';
+  whatsapp: string;
+  messageTemplate: string;
+  /** Path of the public page, e.g. /s/layer-lab. */
+  publicPath: string;
+}
+
+/** An image as the public showcase sees it: no internal id. */
+export type PublicImageView = Omit<ImageView, 'id'>;
+
+/** A label on the public showcase: customers filter by its name. */
+export interface PublicLabelView {
+  name: string;
+  color: string;
+}
+
+export interface PublicBusinessView {
+  name: string;
+  slug: string;
+  title: string;
+  description: string;
+  language: 'en' | 'pt-BR';
+  whatsapp: string;
+  messageTemplate: string;
+  logo: PublicImageView | null;
+  website: string;
+  social: string;
+}
+
+/** Public showcase: only fields meant for customers, never costs, notes, sales data or ids. */
+export interface PublicShowcaseView {
+  business: PublicBusinessView;
+  labels: PublicLabelView[];
+  products: PublicProductCardView[];
+}
+
+export interface PublicProductCardView {
+  slug: string;
+  type: 'product' | 'service';
+  name: string;
+  description: string;
+  labels: PublicLabelView[];
+  badge: 'ready' | 'made_to_order';
+  featured: boolean;
+  /** Present only when the business chose to show it. */
+  price: Money | null;
+  saleUnit: 'unit' | 'hour' | 'service' | 'custom';
+  customUnit: string;
+  specs: ProductView['specs'];
+  cover: PublicImageView | null;
+  imageCount: number;
+}
+
+export interface PublicProductView extends PublicProductCardView {
+  images: PublicImageView[];
+  business: PublicBusinessView;
+}
+
+/** What deleting a stock item or one roll would also remove, shown before confirming. */
+export interface StockDeletePreviewView {
+  lots: number;
+  movements: number;
+  /** Expenses that paid for these rolls. Empty without financial access; see the count. */
+  expenses: {
+    id: string;
+    description: string;
+    amount: Money;
+    /** Also pays for rolls that stay: it is unlinked, never deleted. */
+    shared: boolean;
+  }[];
+  linkedExpenseCount: number;
 }

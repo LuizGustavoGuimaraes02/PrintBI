@@ -38,3 +38,10 @@ labelsRouter.patch('/:labelId', async (req, res) => {
     ),
   );
 });
+
+labelsRouter.delete('/:labelId', async (req, res) => {
+  const auth = getCompanyAuth(req);
+  const labelId = new Types.ObjectId(parseInput(objectIdSchema, req.params.labelId));
+  await service.deleteLabel(auth.companyId, auth.userId, labelId);
+  res.status(204).end();
+});

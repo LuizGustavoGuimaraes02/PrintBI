@@ -66,6 +66,8 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   hint?: ReactNode;
   error?: string | undefined;
   suffix?: ReactNode;
+  /** Fixed text before the value, such as the start of a link. */
+  leading?: ReactNode;
   /** Numbers, weights and amounts use the mono face. */
   mono?: boolean;
   ref?: Ref<HTMLInputElement>;
@@ -76,6 +78,7 @@ export function TextField({
   hint,
   error,
   suffix,
+  leading,
   mono,
   required,
   className,
@@ -86,6 +89,11 @@ export function TextField({
     <FieldFrame label={label} hint={hint} error={error} required={required} className={className}>
       {({ inputId, describedBy }) => (
         <div className={cn(frame(error), 'h-12')}>
+          {leading && (
+            <span className="figure -mr-1 max-w-[45%] shrink-0 truncate text-sm text-ink-muted">
+              {leading}
+            </span>
+          )}
           <input
             ref={ref}
             id={inputId}

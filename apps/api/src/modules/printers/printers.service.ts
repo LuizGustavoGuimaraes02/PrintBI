@@ -140,21 +140,24 @@ export async function updatePrinter(
   return toPrinterView(await findPrinter(companyId, printerId), true);
 }
 
-/** Archived, never deleted: past orders and costs keep pointing at it. */
-export async function archivePrinter(
+/**
+ * Deletes a printer. Nothing points at printers yet; once orders record which printer made
+ * them (Part 7), a printer in use will be archived instead.
+ */
+export async function deletePrinter(
   companyId: Types.ObjectId,
   actorId: Types.ObjectId,
   printerId: Types.ObjectId,
 ): Promise<void> {
   const result = await CompanyModel.updateOne(
-    { _id: companyId, printers: { $elemMatch: { _id: printerId, archivedAt: null } } },
-    { $set: { 'printers.$.archivedAt': new Date() } },
+    { _id: companyId, 'printers._id': printerId },
+    { $pull: { printers: { _id: printerId } } },
   );
   if (result.matchedCount !== 1) throw new NotFoundError('Printer');
   await audit({
     companyId,
     actorId,
-    action: 'printer.archived',
+    action: 'printer.deleted',
     entity: 'printer',
     entityId: printerId,
   });

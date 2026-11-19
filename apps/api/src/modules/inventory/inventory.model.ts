@@ -70,8 +70,9 @@ export type InventoryItem = InferSchemaType<typeof inventoryItemSchema>;
 export const InventoryItemModel = model('InventoryItem', inventoryItemSchema);
 
 /**
- * Append-only stock ledger. Rows are never updated or deleted: a mistake is fixed
- * with a new correction row that points at the one it reverses.
+ * Stock ledger. Rows are never edited: a mistake in a movement is fixed with a correction row
+ * that points at the one it reverses. Rows are removed only together with the item or roll
+ * they belong to, when that item or roll is deleted as a mistake.
  */
 const stockMovementSchema = new Schema(
   {

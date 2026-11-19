@@ -24,3 +24,10 @@ categoriesRouter.patch('/:categoryId', requirePermission('settings:manage'), asy
   const input = parseInput(updateCategorySchema, req.body);
   res.json(await service.updateCategory(auth.companyId, auth.userId, categoryId, input));
 });
+
+categoriesRouter.delete('/:categoryId', requirePermission('settings:manage'), async (req, res) => {
+  const auth = getCompanyAuth(req);
+  const categoryId = new Types.ObjectId(parseInput(objectIdSchema, req.params.categoryId));
+  await service.deleteCategory(auth.companyId, auth.userId, categoryId);
+  res.status(204).end();
+});

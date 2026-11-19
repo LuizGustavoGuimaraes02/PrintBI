@@ -142,3 +142,27 @@ export async function assertUsableSource(
   }
   return source._id;
 }
+
+/** Deletes a source; customers who came from it keep everything else, with no source set. */
+export async function deleteSource(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+  sourceId: Types.ObjectId,
+): Promise<void> {
+  const result = await CompanyModel.updateOne(
+    { _id: companyId, 'customerSources._id': sourceId },
+    { $pull: { customerSources: { _id: sourceId } } },
+  );
+  if (result.matchedCount !== 1) throw new NotFoundError('Source');
+  await CustomerModel.updateMany(
+    { companyId, sourceId },
+    { $set: { sourceId: null, sourceDetail: '' } },
+  );
+  await audit({
+    companyId,
+    actorId,
+    action: 'customer_source.deleted',
+    entity: 'customer_source',
+    entityId: sourceId,
+  });
+}

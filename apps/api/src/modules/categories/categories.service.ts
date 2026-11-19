@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { CompanyModel } from '../companies/company.model';
+import { ExpenseModel } from '../expenses/expense.model';
 
 interface CategoryRecord {
   _id: Types.ObjectId;
@@ -89,4 +90,33 @@ export async function updateCategory(
     changes: input,
   });
   return toView({ _id: categoryId, name, archivedAt });
+}
+
+/**
+ * Deletes a category nobody uses. One that expenses point at is archived instead: deleting it
+ * would leave those expenses without a category.
+ */
+export async function deleteCategory(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+  categoryId: Types.ObjectId,
+): Promise<void> {
+  const inUse = await ExpenseModel.countDocuments({ companyId, categoryId });
+  if (inUse > 0) {
+    throw new ConflictError(
+      `${inUse === 1 ? 'An expense uses' : `${inUse} expenses use`} this category. Archive it instead, or move ${inUse === 1 ? 'it' : 'them'} to another category first.`,
+    );
+  }
+  const result = await CompanyModel.updateOne(
+    { _id: companyId, 'expenseCategories._id': categoryId },
+    { $pull: { expenseCategories: { _id: categoryId } } },
+  );
+  if (result.matchedCount !== 1) throw new NotFoundError('Category');
+  await audit({
+    companyId,
+    actorId,
+    action: 'expense_category.deleted',
+    entity: 'expense_category',
+    entityId: categoryId,
+  });
 }

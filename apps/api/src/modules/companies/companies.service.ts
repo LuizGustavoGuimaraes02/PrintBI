@@ -11,10 +11,20 @@ import { AppError, NotFoundError } from '../../core/errors';
 import { setSessionCompany } from '../auth/sessions';
 import { UserModel } from '../users/user.model';
 import { CompanyModel } from './company.model';
+import { deleteImage, imageView } from '../../core/media/cloudinary';
+import { confirmUpload, logoRule } from '../../core/media/uploads';
 
-const PROFILE_FIELDS = { name: 1, email: 1, phone: 1, address: 1, website: 1, social: 1 } as const;
+const PROFILE_FIELDS = {
+  name: 1,
+  email: 1,
+  phone: 1,
+  address: 1,
+  website: 1,
+  social: 1,
+  logo: 1,
+} as const;
 
-function toCompanyView(company: {
+type CompanyProfileRecord = {
   _id: Types.ObjectId;
   name: string;
   email?: string | null;
@@ -22,7 +32,12 @@ function toCompanyView(company: {
   address?: string | null;
   website?: string | null;
   social?: string | null;
-}): CompanyView {
+  logo?: Parameters<typeof imageView>[0] | null;
+};
+
+// Lean reads type embedded images without their _id, which Mongoose does store.
+function toCompanyView(record: unknown): CompanyView {
+  const company = record as CompanyProfileRecord;
   return {
     id: company._id.toString(),
     name: company.name,
@@ -31,6 +46,7 @@ function toCompanyView(company: {
     address: company.address ?? '',
     website: company.website ?? '',
     social: company.social ?? '',
+    logo: company.logo ? imageView(company.logo) : null,
   };
 }
 
@@ -208,4 +224,52 @@ export async function removeMember(
       session,
     );
   });
+}
+
+/** Sets the logo from a finished upload; the previous file is deleted. */
+export async function setCompanyLogo(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+  publicId: string,
+): Promise<CompanyView> {
+  const stored = await confirmUpload(publicId, logoRule(companyId));
+  const before = await CompanyModel.findByIdAndUpdate(
+    companyId,
+    { $set: { logo: { ...stored, alt: '' } } },
+    { projection: { logo: 1 } },
+  ).lean();
+  if (!before) throw new NotFoundError('Company');
+  if (before.logo && before.logo.publicId !== stored.publicId)
+    await deleteImage(before.logo.publicId);
+  await audit({
+    companyId,
+    actorId,
+    action: 'company.logo_set',
+    entity: 'company',
+    entityId: companyId,
+  });
+  return getCompany(companyId);
+}
+
+export async function removeCompanyLogo(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+): Promise<CompanyView> {
+  const before = await CompanyModel.findByIdAndUpdate(
+    companyId,
+    { $set: { logo: null } },
+    { projection: { logo: 1 } },
+  ).lean();
+  if (!before) throw new NotFoundError('Company');
+  if (before.logo) {
+    await deleteImage(before.logo.publicId);
+    await audit({
+      companyId,
+      actorId,
+      action: 'company.logo_removed',
+      entity: 'company',
+      entityId: companyId,
+    });
+  }
+  return getCompany(companyId);
 }

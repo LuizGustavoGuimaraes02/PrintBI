@@ -74,6 +74,8 @@ interface ConfirmDialogProps {
   tone?: 'primary' | 'danger';
   loading?: boolean;
   onConfirm: () => void;
+  /** Extra content between the description and the buttons, such as an option. */
+  children?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -86,6 +88,7 @@ export function ConfirmDialog({
   tone = 'primary',
   loading,
   onConfirm,
+  children,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -98,6 +101,7 @@ export function ConfirmDialog({
           <AlertDialog.Description className="text-ink-muted">
             {description}
           </AlertDialog.Description>
+          {children}
           <div className="flex flex-wrap justify-end gap-3">
             <AlertDialog.Cancel asChild>
               <Button variant="ghost">{cancelLabel}</Button>

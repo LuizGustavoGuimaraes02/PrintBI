@@ -9,3 +9,5 @@ export * from './Toast';
 export * from './ImageSlot';
 export * from './ColorSwatch';
 export * from './SearchCombobox';
+export * from './DeleteAction';
+export * from './InlineDelete';

@@ -35,17 +35,27 @@ function ProductRow({ product, canSeeCost }: { product: ProductView; canSeeCost:
         to={`/products/${product.id}`}
         className="grid gap-x-5 gap-y-2 rounded-[var(--radius-tile)] px-3 py-4 hover:bg-bench sm:grid-cols-[56px_1fr_auto] sm:items-center"
       >
-        {/* Photo thumbnail arrives with uploads; until then a layered placeholder. */}
-        <span
-          aria-hidden="true"
-          className="hidden size-14 place-items-center rounded-2xl bg-bench text-steel sm:grid"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(0deg, transparent 0 5px, rgb(93 116 128 / 0.12) 5px 6px)',
-          }}
-        >
-          <Package size={22} strokeWidth={1.5} />
-        </span>
+        {product.images[0] ? (
+          <img
+            src={product.images[0].urls.thumb}
+            alt=""
+            width={56}
+            height={56}
+            loading="lazy"
+            className="hidden size-14 rounded-2xl bg-bench object-cover sm:block"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="hidden size-14 place-items-center rounded-2xl bg-bench text-steel sm:grid"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(0deg, transparent 0 5px, rgb(93 116 128 / 0.12) 5px 6px)',
+            }}
+          >
+            <Package size={22} strokeWidth={1.5} />
+          </span>
+        )}
         <span className="flex min-w-0 flex-col gap-1.5">
           <span className="flex flex-wrap items-center gap-2">
             <strong className="text-[16px]">{product.name}</strong>

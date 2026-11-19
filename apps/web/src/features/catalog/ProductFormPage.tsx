@@ -6,16 +6,17 @@ import {
   type ProductView,
 } from '@printbi/shared';
 import { ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import {
   Badge,
   Button,
   cn,
   ConfirmDialog,
+  DeleteAction,
   EmptyState,
-  ImageSlot,
   Notice,
   PageHeader,
   PageLoader,
@@ -39,7 +40,10 @@ import {
   type ProductForm,
 } from './forms';
 import { LabelPicker } from './LabelPicker';
-import { useLabels, useProduct, useRefreshCatalog } from './queries';
+import { ProductPhotos } from './ProductPhotos';
+import { ProductShowcasePanel } from './ProductShowcasePanel';
+import { catalogKeys, useLabels, useProduct, useRefreshCatalog } from './queries';
+import { keys as settingsKeys } from '../settings/queries';
 
 export function NewProductPage() {
   const { data: settings } = useSettings();
@@ -95,6 +99,15 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const refresh = useRefreshCatalog();
+  const queryClient = useQueryClient();
+  const location = useLocation();
+  const photosPanel = useRef<HTMLElement>(null);
+  const focusPhotos = (location.state as { focus?: string } | null)?.focus === 'photos';
+
+  // Arriving from "Save and add photos": bring the upload button into view.
+  useEffect(() => {
+    if (focusPhotos) photosPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focusPhotos]);
   const canSeeCost = useCan('finance:view');
   const canArchive = useCan('records:archive');
   const [archiving, setArchiving] = useState(false);
@@ -108,7 +121,8 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
   const { prompt: guard, allowLeave } = useUnsavedChangesGuard(formState.isDirty);
   const margin = canSeeCost ? marginNote(price, estimatedCost) : null;
 
-  const submit = (addAnother: boolean) =>
+  /** After saving: back to the list, a blank form for the next one, or this product's photos. */
+  const submit = (then: 'list' | 'another' | 'photos') =>
     handleSubmit(async (values) => {
       const payload = productPayload(values, canSeeCost);
       if (!checkPayload(productInputSchema, payload, setError, productFormPath)) return;
@@ -118,15 +132,25 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
           : await api.post<ProductView>('/products', payload);
         await refresh();
         toast.success(product ? 'Changes saved' : 'Added to the catalog', saved.name);
-        if (addAnother) reset(emptyProduct(values.currency));
+        if (then === 'another') reset(emptyProduct(values.currency));
         else {
           allowLeave();
-          void navigate('/products');
+          void navigate(then === 'photos' ? `/products/${saved.id}` : '/products', {
+            replace: then === 'photos',
+            state: then === 'photos' ? { focus: 'photos' } : undefined,
+          });
         }
       } catch (error) {
         applyMappedServerErrors(error, setError, productFormPath);
       }
     });
+
+  /** Photos and showcase settings save on their own, without the form's Save button. */
+  const applySaved = (saved: ProductView) => {
+    queryClient.setQueryData(catalogKeys.product(saved.id), saved);
+    void queryClient.invalidateQueries({ queryKey: ['catalog', 'products'] });
+    void queryClient.invalidateQueries({ queryKey: settingsKeys.showcaseProducts });
+  };
 
   const setArchived = async (archived: boolean) => {
     if (!product) return;
@@ -150,6 +174,8 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
     ...register(name),
   });
 
+  const showcase = product && <ProductShowcasePanel product={product} onChange={applySaved} />;
+
   return (
     <>
       {guard}
@@ -169,16 +195,36 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
         }
         actions={
           product &&
-          canArchive &&
-          (product.archived ? (
-            <Button variant="soft" onClick={() => void setArchived(false)}>
-              Restore
-            </Button>
-          ) : (
-            <Button variant="ghost" onClick={() => setArchiving(true)}>
-              Archive
-            </Button>
-          ))
+          canArchive && (
+            <>
+              {product.archived ? (
+                <Button variant="soft" onClick={() => void setArchived(false)}>
+                  Restore
+                </Button>
+              ) : (
+                <Button variant="ghost" onClick={() => setArchiving(true)}>
+                  Archive
+                </Button>
+              )}
+              <DeleteAction
+                title={`Delete ${product.name}?`}
+                description="Removed for good, with its photos. Use it for something added by mistake; archive what you stopped selling, to keep it in past records."
+                confirmLabel={product.type === 'service' ? 'Delete service' : 'Delete product'}
+                onDelete={async () => {
+                  try {
+                    await api.delete(`/products/${product.id}`);
+                  } catch (e) {
+                    toast.error('Not deleted', e instanceof ApiError ? e.message : undefined);
+                    throw e;
+                  }
+                  toast.success('Deleted', product.name);
+                  allowLeave();
+                  void navigate('/products', { replace: true });
+                  await refresh();
+                }}
+              />
+            </>
+          )
         }
       />
       {product?.archived && (
@@ -187,74 +233,106 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
         </Notice>
       )}
 
-      <form onSubmit={(e) => void submit(false)(e)} noValidate className="flex flex-col gap-5">
-        <Panel title="What it is">
-          <fieldset className="flex min-w-0 flex-col gap-2">
-            <legend className="sr-only">Type</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {TYPES.map((t) => (
-                <label
-                  key={t.value}
-                  className={cn(
-                    'flex cursor-pointer flex-col gap-0.5 rounded-[var(--radius-tile)] border-[1.5px] px-4 py-3',
-                    type === t.value ? 'border-teal bg-teal-soft' : 'border-rule hover:bg-bench',
-                  )}
-                >
-                  <span className="flex items-center gap-2 font-bold">
-                    <input
-                      type="radio"
-                      value={t.value}
-                      className="accent-teal"
-                      {...register('type')}
-                    />
-                    {t.label}
-                  </span>
-                  <span className="pl-6 text-[13px] text-ink-muted">{t.hint}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <TextField
-              label="Name"
-              required
-              className="sm:col-span-2"
-              placeholder={type === 'service' ? 'e.g. 3D modelling' : 'e.g. Articulated dragon'}
-              error={errors.name?.message}
-              {...register('name')}
-            />
-            <TextAreaField
-              label="Description"
-              rows={3}
-              className="sm:col-span-2"
-              hint="Customers will see this on the showcase."
-              error={errors.description?.message}
-              {...register('description')}
-            />
-          </div>
-          <Controller
-            control={control}
-            name="labelIds"
-            render={({ field, fieldState }) => (
-              <LabelPicker
-                labels={labels}
-                value={field.value}
-                onChange={field.onChange}
-                error={fieldState.error?.message}
+      {/*
+        One grid for the whole page: [main | 340px side]. The photo column inside Details is
+        sized so its content lines up with the Showcase card below it.
+      */}
+      <form
+        onSubmit={(e) => void submit('list')(e)}
+        noValidate
+        className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]"
+      >
+        <Panel title="Details" className="lg:col-span-2">
+          <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_284px]">
+            <div className="flex min-w-0 flex-col gap-5">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <TextField
+                  label="Name"
+                  required
+                  placeholder={type === 'service' ? 'e.g. 3D modelling' : 'e.g. Articulated dragon'}
+                  error={errors.name?.message}
+                  {...register('name')}
+                />
+                <fieldset className="flex min-w-0 flex-col gap-1.5">
+                  <legend className="label-mono mb-1.5 text-ink-muted">Type</legend>
+                  <div className="flex h-12 rounded-full bg-bench p-1">
+                    {TYPES.map((t) => (
+                      <label
+                        key={t.value}
+                        title={t.hint}
+                        className={cn(
+                          'flex flex-1 cursor-pointer items-center justify-center rounded-full px-4 text-sm font-semibold whitespace-nowrap transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-teal',
+                          type === t.value
+                            ? 'bg-surface text-ink shadow-sm'
+                            : 'text-ink-muted hover:text-ink',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          value={t.value}
+                          className="sr-only"
+                          {...register('type')}
+                        />
+                        {t.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </div>
+              <TextAreaField
+                label="Description"
+                rows={3}
+                hint="Customers see this on the showcase."
+                error={errors.description?.message}
+                {...register('description')}
               />
-            )}
-          />
+              <Controller
+                control={control}
+                name="labelIds"
+                render={({ field, fieldState }) => (
+                  <LabelPicker
+                    labels={labels}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+              <TextAreaField
+                label="Private notes"
+                rows={2}
+                hint="Print settings, supplier... only your team sees this."
+                error={errors.notes?.message}
+                {...register('notes')}
+              />
+            </div>
+            <section
+              ref={photosPanel}
+              aria-label="Photos"
+              className="scroll-mt-6 lg:border-l lg:border-rule-soft lg:pl-8"
+            >
+              <ProductPhotos
+                product={product}
+                onChange={applySaved}
+                onSaveFirst={() => void submit('photos')()}
+                saving={formState.isSubmitting}
+              />
+            </section>
+          </div>
         </Panel>
 
-        <Panel title="Price">
-          <div className="grid gap-5 sm:grid-cols-2">
+        <Panel
+          title={type === 'product' ? 'Price and size' : 'Price'}
+          className={cn(!showcase && 'lg:col-span-2')}
+        >
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <SelectField label="Sold" {...register('saleUnit')}>
               <option value="unit">Per piece</option>
               <option value="hour">Per hour</option>
               <option value="service">Per job</option>
               <option value="custom">Other unit</option>
             </SelectField>
-            {saleUnit === 'custom' ? (
+            {saleUnit === 'custom' && (
               <TextField
                 label="Unit name"
                 required
@@ -262,14 +340,7 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
                 error={errors.customUnit?.message}
                 {...register('customUnit')}
               />
-            ) : (
-              <span className="hidden sm:block" />
             )}
-            <TextField
-              label="Usual price"
-              hint="Leave empty to price each quote."
-              {...money('price')}
-            />
             <SelectField label="Currency" {...register('currency')}>
               {(['CAD', 'BRL'] as Currency[]).map((c) => (
                 <option key={c} value={c}>
@@ -277,86 +348,77 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
                 </option>
               ))}
             </SelectField>
-            {canSeeCost && (
-              <TextField
-                label="Estimated cost"
-                hint="Your cost to make one. Saved calculations will fill this in."
-                {...money('estimatedCost')}
-              />
-            )}
+            <TextField label="Usual price" {...money('price')} />
+            {canSeeCost && <TextField label="Estimated cost" {...money('estimatedCost')} />}
           </div>
-          {margin && <p className="figure text-sm text-ink-muted">{margin}</p>}
-        </Panel>
-
-        {type === 'product' && (
-          <Panel
-            title="Size and filament"
-            description="A typical piece. Shown on the showcase and used to start a calculation."
-          >
-            <div className="grid grid-cols-3 gap-3 sm:max-w-xl">
-              {(['widthMm', 'depthMm', 'heightMm'] as const).map((name, i) => (
+          <p className="-mt-1 text-[13px] text-ink-muted">
+            Leave the price empty to price each quote.
+            {margin && <span className="figure"> · {margin}</span>}
+          </p>
+          {type === 'product' && (
+            <>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-rule-soft pt-4">
+                <h3 className="font-bold whitespace-nowrap">Typical piece</h3>
+                <span className="text-[13px] text-ink-muted">
+                  Shown on the showcase; starts a calculation.
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                {(['widthMm', 'depthMm', 'heightMm'] as const).map((name, i) => (
+                  <TextField
+                    key={name}
+                    label={['Width', 'Depth', 'Height'][i] ?? ''}
+                    inputMode="decimal"
+                    mono
+                    suffix="mm"
+                    error={errors[name]?.message}
+                    {...register(name)}
+                  />
+                ))}
                 <TextField
-                  key={name}
-                  label={['Width', 'Depth', 'Height'][i] ?? ''}
+                  label="Filament"
                   inputMode="decimal"
                   mono
-                  suffix="mm"
-                  error={errors[name]?.message}
-                  {...register(name)}
+                  suffix="g"
+                  error={errors.filamentGrams?.message}
+                  {...register('filamentGrams')}
                 />
-              ))}
-            </div>
-            <TextField
-              label="Filament used"
-              inputMode="decimal"
-              mono
-              suffix="g"
-              className="sm:max-w-56"
-              error={errors.filamentGrams?.message}
-              {...register('filamentGrams')}
-            />
-          </Panel>
-        )}
-
-        <Panel title="Photos and notes">
-          <div className="grid gap-6 md:grid-cols-[auto_1fr]">
-            <ImageSlot label="Product photos" size="1600 × 1600" formats="JPG, WebP, PNG · up to 8">
-              <span className="max-w-56 text-[13px] text-ink-muted">
-                Photo uploads open with the showcase.
-              </span>
-            </ImageSlot>
-            <TextAreaField
-              label="Private notes"
-              rows={5}
-              hint="Print settings, supplier, anything only your team should see."
-              error={errors.notes?.message}
-              {...register('notes')}
-            />
-          </div>
+              </div>
+            </>
+          )}
         </Panel>
 
-        {errors.root?.server && (
-          <Notice tone="attention" title="Not saved">
-            {errors.root.server.message}
-          </Notice>
-        )}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" loading={formState.isSubmitting}>
-            {product ? 'Save changes' : 'Save'}
+        {showcase}
+
+        {/* Actions sit on the right, the main one last, where the eye ends the form. */}
+        <div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">
+          {errors.root?.server && (
+            <div className="w-full">
+              <Notice tone="attention" title="Not saved">
+                {errors.root.server.message}
+              </Notice>
+            </div>
+          )}
+          {product && product.soldQuantity > 0 && (
+            <span className="mr-auto">
+              <Badge>{product.soldQuantity} sold</Badge>
+            </span>
+          )}
+          <Button variant="ghost" onClick={() => void navigate('/products')}>
+            Cancel
           </Button>
           {!product && (
             <Button
               variant="soft"
               loading={formState.isSubmitting}
-              onClick={() => void submit(true)()}
+              onClick={() => void submit('another')()}
             >
               Save &amp; add another
             </Button>
           )}
-          <Button variant="ghost" onClick={() => void navigate('/products')}>
-            Cancel
+          <Button type="submit" loading={formState.isSubmitting}>
+            {product ? 'Save changes' : 'Save'}
           </Button>
-          {product && product.soldQuantity > 0 && <Badge>{product.soldQuantity} sold</Badge>}
         </div>
       </form>
 

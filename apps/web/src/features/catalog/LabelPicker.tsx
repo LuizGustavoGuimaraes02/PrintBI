@@ -1,5 +1,5 @@
 import { LABEL_COLORS, type LabelView } from '@printbi/shared';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Button, cn, useToast } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
@@ -81,6 +81,14 @@ export function LabelPicker({ labels, value, onChange, error }: LabelPickerProps
   const [creating, setCreating] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const shown = labels.filter((l) => !l.archived || value.includes(l.id));
+  // The create form stays folded behind a small button, unless there is nothing to pick yet.
+  const [adding, setAdding] = useState(false);
+  const open = adding || shown.length === 0;
+  const close = () => {
+    setAdding(false);
+    setName('');
+    setProblem(null);
+  };
   const toggle = (id: string) =>
     onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
 
@@ -100,8 +108,7 @@ export function LabelPicker({ labels, value, onChange, error }: LabelPickerProps
       const label = await api.post<LabelView>('/labels', { name: trimmed, color });
       await refresh();
       onChange([...value, label.id]);
-      setName('');
-      setProblem(null);
+      close();
       setColor(
         LABEL_COLORS[(LABEL_COLORS.indexOf(color as never) + 1) % LABEL_COLORS.length] ?? color,
       );
@@ -114,76 +121,99 @@ export function LabelPicker({ labels, value, onChange, error }: LabelPickerProps
   };
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-3">
-      <legend className="mb-2 text-sm font-semibold">Labels</legend>
-      {shown.length > 0 ? (
-        <div role="group" aria-label="Choose labels" className="flex flex-wrap gap-2">
-          {shown.map((label) => {
-            const on = value.includes(label.id);
-            return (
-              <button
-                key={label.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(label.id)}
-                className={cn(
-                  'inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-[14px] font-semibold',
-                  on ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink',
-                )}
-                style={{ background: label.color }}
-              >
-                {on && <Check size={14} aria-hidden="true" />}
-                {label.name}
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-sm text-ink-muted">
+    <fieldset className="flex min-w-0 flex-col gap-2.5">
+      <legend className="label-mono mb-1.5 text-ink-muted">Labels</legend>
+      <div role="group" aria-label="Choose labels" className="flex flex-wrap items-center gap-2">
+        {shown.map((label) => {
+          const on = value.includes(label.id);
+          return (
+            <button
+              key={label.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggle(label.id)}
+              className={cn(
+                'inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-[14px] font-semibold',
+                on ? 'border-ink text-ink' : 'border-transparent text-ink-muted hover:text-ink',
+              )}
+              style={{ background: label.color }}
+            >
+              {on && <Check size={14} aria-hidden="true" />}
+              {label.name}
+            </button>
+          );
+        })}
+        {shown.length > 0 && !open && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-rule px-3.5 text-[14px] font-semibold text-ink-muted hover:border-teal hover:text-teal"
+          >
+            <Plus size={14} aria-hidden="true" />
+            New label
+          </button>
+        )}
+      </div>
+      {shown.length === 0 && (
+        <p className="text-[13px] text-ink-muted">
           No labels yet. Labels group your work (Keychain, Fridge magnet, Vase) in lists, sales and
           the showcase.
         </p>
       )}
-      <div className="flex flex-col gap-2 rounded-[var(--radius-tile)] bg-bench p-3">
-        <label htmlFor={inputId} className="text-[13px] font-semibold text-ink-muted">
-          New label
-        </label>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            id={inputId}
-            value={name}
-            maxLength={40}
-            placeholder="e.g. Keychain"
-            aria-invalid={problem ? true : undefined}
-            onChange={(e) => {
-              setName(e.target.value);
-              setProblem(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                void create();
-              }
-            }}
-            className="h-10 min-w-40 flex-1 rounded-full border-[1.5px] border-rule bg-surface px-4 outline-none focus:border-teal"
-          />
-          <Button
-            variant="soft"
-            size="sm"
-            loading={creating}
-            icon={<Plus size={16} aria-hidden="true" />}
-            onClick={() => void create()}
-          >
-            Add label
-          </Button>
+      {open && (
+        <div className="flex flex-col gap-2.5 rounded-[var(--radius-tile)] bg-bench p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={inputId} className="sr-only">
+              Label name
+            </label>
+            <input
+              id={inputId}
+              value={name}
+              maxLength={40}
+              autoFocus={adding}
+              placeholder="New label, e.g. Keychain"
+              aria-invalid={problem ? true : undefined}
+              onChange={(e) => {
+                setName(e.target.value);
+                setProblem(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void create();
+                }
+                if (e.key === 'Escape' && shown.length > 0) close();
+              }}
+              className="h-10 min-w-40 flex-1 rounded-full border-[1.5px] border-rule bg-surface px-4 outline-none focus:border-teal"
+            />
+            <Button
+              variant="soft"
+              size="sm"
+              loading={creating}
+              icon={<Plus size={16} aria-hidden="true" />}
+              onClick={() => void create()}
+            >
+              Add label
+            </Button>
+            {shown.length > 0 && (
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close new label"
+                className="grid size-9 place-items-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <LabelColorChoice value={color} onChange={setColor} name="the new label" />
         </div>
-        <LabelColorChoice value={color} onChange={setColor} name="the new label" />
-        {(problem ?? error) && (
-          <p role="alert" className="text-[13px] font-semibold text-hot-ink">
-            {problem ?? error}
-          </p>
-        )}
-      </div>
+      )}
+      {(problem ?? error) && (
+        <p role="alert" className="text-[13px] font-semibold text-hot-ink">
+          {problem ?? error}
+        </p>
+      )}
     </fieldset>
   );
 }

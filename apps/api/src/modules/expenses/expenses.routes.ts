@@ -102,3 +102,14 @@ expensesRouter.post(
     );
   },
 );
+
+expensesRouter.delete(
+  '/:expenseId',
+  manage,
+  requirePermission('records:archive'),
+  async (req, res) => {
+    const auth = getCompanyAuth(req);
+    await service.deleteExpense(auth.companyId, auth.userId, id(req.params.expenseId));
+    res.status(204).end();
+  },
+);

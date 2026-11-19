@@ -1,6 +1,6 @@
 import type { CustomerSourceView } from '@printbi/shared';
 import { useState } from 'react';
-import { Button, cn, Modal, useToast } from '../../design-system';
+import { Button, cn, InlineDelete, Modal, useToast } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
 import { useCustomerSources, useRefreshCustomers } from './queries';
 
@@ -125,6 +125,24 @@ function SourceRow({
       >
         {source.archived ? 'Restore' : 'Archive'}
       </Button>
+      <InlineDelete
+        name={source.name}
+        consequence={
+          source.customerCount > 0
+            ? `${source.customerCount} ${source.customerCount === 1 ? 'customer keeps' : 'customers keep'} everything else, with no source.`
+            : undefined
+        }
+        onDelete={async () => {
+          try {
+            await api.delete(`/customer-sources/${source.id}`);
+            await refresh();
+            toast.success('Source deleted', source.name);
+          } catch (e) {
+            toast.error('Not deleted', e instanceof ApiError ? e.message : undefined);
+            throw e;
+          }
+        }}
+      />
     </li>
   );
 }

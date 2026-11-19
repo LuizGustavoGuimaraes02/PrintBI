@@ -1,10 +1,11 @@
 import { formatMoney, type CustomerView } from '@printbi/shared';
 import { ArrowLeft, Mail, MessageCircle, Phone } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   Button,
   ConfirmDialog,
+  DeleteAction,
   EmptyState,
   Notice,
   PageHeader,
@@ -50,6 +51,7 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
   const canSeeFinance = useCan('finance:view');
   const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const navigate = useNavigate();
   const whatsapp = whatsappLink(customer.phone);
 
   const setArchived = async (archived: boolean) => {
@@ -99,6 +101,24 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
                   Archive
                 </Button>
               ))}
+            {canArchive && (
+              <DeleteAction
+                title={`Delete ${customer.name}?`}
+                description="Removed for good. Use it for a customer added by mistake; archive one you no longer serve, to keep their history."
+                confirmLabel="Delete customer"
+                onDelete={async () => {
+                  try {
+                    await api.delete(`/customers/${customer.id}`);
+                  } catch (e) {
+                    toast.error('Not deleted', e instanceof ApiError ? e.message : undefined);
+                    throw e;
+                  }
+                  toast.success('Customer deleted', customer.name);
+                  void navigate('/customers', { replace: true });
+                  await refresh();
+                }}
+              />
+            )}
           </>
         }
       />

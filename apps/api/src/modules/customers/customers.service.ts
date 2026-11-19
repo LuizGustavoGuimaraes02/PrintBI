@@ -124,3 +124,24 @@ export async function setCustomerArchived(
   });
   return getCustomer(companyId, id);
 }
+
+/** Deletes a customer entered by mistake. (Once quotes exist, customers in use are archived.) */
+export async function deleteCustomer(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+  id: Types.ObjectId,
+): Promise<void> {
+  const customer = await CustomerModel.findOneAndDelete(
+    { _id: id, companyId },
+    { projection: { name: 1 } },
+  ).lean();
+  if (!customer) throw new NotFoundError('Customer');
+  await audit({
+    companyId,
+    actorId,
+    action: 'customer.deleted',
+    entity: 'customer',
+    entityId: id,
+    reason: customer.name,
+  });
+}

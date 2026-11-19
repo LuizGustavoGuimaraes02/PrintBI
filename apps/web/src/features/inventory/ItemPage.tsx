@@ -6,7 +6,7 @@ import {
 } from '@printbi/shared';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   Badge,
   Button,
@@ -26,6 +26,7 @@ import { showUnitMoney } from '../../lib/money';
 import { showQuantity, unitLabel } from '../../lib/quantity';
 import { useCan } from '../auth/account';
 import { ConsumeDialog } from './ConsumeDialog';
+import { DeleteStockDialog } from './DeleteStockDialog';
 import {
   AddLotDialog,
   AdjustDialog,
@@ -65,6 +66,7 @@ type Dialog =
   | { kind: 'addLot' }
   | { kind: 'edit' }
   | { kind: 'archive' }
+  | { kind: 'delete'; lot?: InventoryLotView }
   | { kind: 'adjust'; lot: InventoryLotView }
   | { kind: 'lot'; lot: InventoryLotView }
   | { kind: 'reverse'; movement: StockMovementView };
@@ -101,6 +103,7 @@ function Fact({ label, value, attention }: { label: string; value: string; atten
 
 function ItemDetail({ item }: { item: InventoryItemView }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const refresh = useRefreshInventory();
   const canSeeFinance = useCan('finance:view');
   const canArchive = useCan('records:archive');
@@ -187,6 +190,15 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                 Archive
               </Button>
             ))}
+          {canArchive && (
+            <Button
+              variant="ghost"
+              className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+              onClick={() => setDialog({ kind: 'delete' })}
+            >
+              Delete
+            </Button>
+          )}
         </div>
       </header>
 
@@ -338,6 +350,16 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                     Edit
                   </Button>
                   <LotArchiveButton item={item} lot={lot} />
+                  {canArchive && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+                      onClick={() => setDialog({ kind: 'delete', lot })}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </li>
             ))}
@@ -424,6 +446,17 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
       {dialog?.kind === 'lot' && <LotDetailsDialog item={item} lot={dialog.lot} onClose={close} />}
       {dialog?.kind === 'reverse' && (
         <ReverseDialog item={item} movement={dialog.movement} onClose={close} />
+      )}
+      {dialog?.kind === 'delete' && (
+        <DeleteStockDialog
+          item={item}
+          lot={dialog.lot}
+          onClose={close}
+          onDeleted={async () => {
+            if (!dialog.lot) void navigate('/inventory', { replace: true });
+            await refresh();
+          }}
+        />
       )}
       <ConfirmDialog
         open={dialog?.kind === 'archive'}

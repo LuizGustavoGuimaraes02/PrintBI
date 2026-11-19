@@ -1,7 +1,7 @@
 import { formatMoney, paymentInputSchema, type ExpenseView } from '@printbi/shared';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   Badge,
   Button,
@@ -63,6 +63,8 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<'confirm' | 'busy' | null>(null);
+  const navigate = useNavigate();
   const money = (amount: number) => formatMoney({ amount, currency: expense.amount.currency });
   const open = expense.status !== 'cancelled';
 
@@ -75,6 +77,20 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
       toast.error('Not removed', e instanceof ApiError ? e.message : undefined);
     } finally {
       setRemoving(null);
+    }
+  };
+
+  /** For an expense entered by mistake; a real one that was called off is cancelled. */
+  const deleteExpense = async () => {
+    setDeleting('busy');
+    try {
+      await api.delete(`/expenses/${expense.id}`);
+      toast.success('Expense deleted', expense.description);
+      void navigate('/expenses', { replace: true });
+      await refresh();
+    } catch (e) {
+      toast.error('Not deleted', e instanceof ApiError ? e.message : undefined);
+      setDeleting(null);
     }
   };
 
@@ -108,6 +124,15 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
           {canManage && canArchive && open && (
             <Button variant="ghost" onClick={() => setCancelling(true)}>
               Cancel expense
+            </Button>
+          )}
+          {canManage && canArchive && (
+            <Button
+              variant="ghost"
+              className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+              onClick={() => setDeleting('confirm')}
+            >
+              Delete
             </Button>
           )}
         </div>
@@ -209,6 +234,30 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
 
       {paying && <PaymentDialog expense={expense} onClose={() => setPaying(false)} />}
       {cancelling && <CancelDialog expense={expense} onClose={() => setCancelling(false)} />}
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title="Delete this expense?"
+        description={
+          <>
+            It is removed for good, with its payments. Use it for an expense entered by mistake; one
+            that really happened and was called off should be cancelled instead.
+            {expense.stock.length > 0 && (
+              <span className="mt-2 block">
+                The{' '}
+                {expense.stock.length === 1
+                  ? 'roll it paid for stays'
+                  : `${expense.stock.length} rolls it paid for stay`}{' '}
+                in stock, listed again as not recorded in expenses.
+              </span>
+            )}
+          </>
+        }
+        confirmLabel="Delete expense"
+        tone="danger"
+        loading={deleting === 'busy'}
+        onConfirm={() => void deleteExpense()}
+      />
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(o) => !o && setRemoving(null)}

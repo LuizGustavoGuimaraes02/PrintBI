@@ -139,3 +139,18 @@ export async function assertUsableLabels(
   }
   return [...new Set(labelIds)].map((id) => new Types.ObjectId(id));
 }
+
+/** Deletes a label and takes it off every product that carries it. */
+export async function deleteLabel(
+  companyId: Types.ObjectId,
+  actorId: Types.ObjectId,
+  labelId: Types.ObjectId,
+): Promise<void> {
+  const result = await CompanyModel.updateOne(
+    { _id: companyId, 'labels._id': labelId },
+    { $pull: { labels: { _id: labelId } } },
+  );
+  if (result.matchedCount !== 1) throw new NotFoundError('Label');
+  await ProductModel.updateMany({ companyId, labelIds: labelId }, { $pull: { labelIds: labelId } });
+  await audit({ companyId, actorId, action: 'label.deleted', entity: 'label', entityId: labelId });
+}

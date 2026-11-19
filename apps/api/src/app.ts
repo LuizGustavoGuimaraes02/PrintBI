@@ -22,6 +22,8 @@ import { invitesRouter } from './modules/invites/invites.routes';
 import { labelsRouter } from './modules/labels/labels.routes';
 import { productsRouter } from './modules/products/products.routes';
 import { printerCatalogRouter } from './modules/printer-catalog/printer-catalog.routes';
+import { publicShowcaseRouter } from './modules/showcase/showcase.routes';
+import { uploadsRouter } from './modules/uploads/uploads.routes';
 
 export interface AppOptions {
   corsOrigins?: readonly string[];
@@ -53,6 +55,9 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
 
   app.use('/health', healthRouter);
 
+  // Public showcase: no session, its own rate limit, and safe to cache.
+  app.use('/api/v1/public', publicShowcaseRouter);
+
   const api = express.Router();
   api.use(apiRateLimit, csrfProtection);
   api.use('/auth', authRouter);
@@ -66,6 +71,7 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/products', productsRouter);
   api.use('/customers', customersRouter);
   api.use('/customer-sources', customerSourcesRouter);
+  api.use('/uploads', uploadsRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

@@ -64,19 +64,20 @@ The web dev server proxies `/api` and `/health` to the API, so the browser talks
 
 ### Environment variables (`apps/api/.env`)
 
-| Variable                   | Description                                                |
-| -------------------------- | ---------------------------------------------------------- |
-| `NODE_ENV`                 | `development`, `test` or `production`                      |
-| `PORT`                     | API port (default `3000`)                                  |
-| `MONGO_URI`                | MongoDB connection string (replica set)                    |
-| `CORS_ORIGINS`             | Comma-separated allowed web origins                        |
-| `LOG_LEVEL`                | pino log level (default `info`)                            |
-| `WEB_URL`                  | Public web URL, used in reset and invite links             |
-| `JWT_ACCESS_SECRET`        | Access-token signing secret (32+ random characters)        |
-| `ACCESS_TOKEN_TTL_MINUTES` | Access-token lifetime (default 15)                         |
-| `REFRESH_TOKEN_TTL_DAYS`   | Refresh-token lifetime (default 7)                         |
-| `SESSION_IDLE_MINUTES`     | Inactivity limit for refreshing (default 30)               |
-| `AUTH_RATE_LIMIT`          | Requests per IP per 15 minutes on auth routes (default 20) |
+| Variable                   | Description                                                   |
+| -------------------------- | ------------------------------------------------------------- |
+| `NODE_ENV`                 | `development`, `test` or `production`                         |
+| `PORT`                     | API port (default `3000`)                                     |
+| `MONGO_URI`                | MongoDB connection string (replica set)                       |
+| `CORS_ORIGINS`             | Comma-separated allowed web origins                           |
+| `LOG_LEVEL`                | pino log level (default `info`)                               |
+| `WEB_URL`                  | Public web URL, used in reset and invite links                |
+| `JWT_ACCESS_SECRET`        | Access-token signing secret (32+ random characters)           |
+| `ACCESS_TOKEN_TTL_MINUTES` | Access-token lifetime (default 15)                            |
+| `REFRESH_TOKEN_TTL_DAYS`   | Refresh-token lifetime (default 7)                            |
+| `SESSION_IDLE_MINUTES`     | Inactivity limit for refreshing (default 30)                  |
+| `AUTH_RATE_LIMIT`          | Requests per IP per 15 minutes on auth routes (default 20)    |
+| `CLOUDINARY_URL`           | Optional image storage: `cloudinary://<key>:<secret>@<cloud>` |
 
 ## Design decisions
 
@@ -169,18 +170,34 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | POST              | `/inventory/consumptions`                          | Member · Idempotency-Key             |
 | POST              | `/inventory/movements/:id/reverse`                 | Member · Idempotency-Key             |
 | POST              | `/inventory/items/:id/archive`                     | `records:archive`                    |
+| GET               | `/inventory/items/:id/delete-preview`              | `records:archive`                    |
+| DELETE            | `/inventory/items/:id[/lots/:lotId]`               | `records:archive`                    |
 | GET               | `/expenses`, `/expenses/summary`, `/expenses/:id`  | `finance:view`                       |
 | POST, PATCH       | `/expenses[/:id]`                                  | `finance:manage`                     |
 | POST, DELETE      | `/expenses/:id/payments[/:paymentId]`              | `finance:manage` (POST: key)         |
 | POST              | `/expenses/:id/cancel`                             | `finance:manage` + `records:archive` |
+| DELETE            | `/expenses/:id`                                    | `finance:manage` + `records:archive` |
 | GET, POST         | `/labels`                                          | Member                               |
 | PATCH             | `/labels/:id`                                      | Member                               |
 | GET, POST, PUT    | `/products[/:id]`                                  | Member (cost needs `finance:view`)   |
 | POST              | `/products/:id/archive`                            | `records:archive`                    |
+| DELETE            | `/products/:id`                                    | `records:archive`                    |
+| POST, PUT         | `/products/:id/images`                             | Member (register, reorder, alt text) |
+| DELETE            | `/products/:id/images/:imageId`                    | Member                               |
+| PUT               | `/products/:id/showcase`                           | `showcase:manage`                    |
+| GET               | `/uploads/config`                                  | Member                               |
+| POST              | `/uploads/sign`                                    | Member (logo: `settings:manage`)     |
+| POST, DELETE      | `/companies/current/logo`                          | `settings:manage`                    |
+| GET               | `/companies/current/showcase[/products]`           | Member                               |
+| PUT               | `/companies/current/showcase[/order]`              | `showcase:manage`                    |
+| GET               | `/public/showcase/:slug[/:productSlug]`            | Public, own rate limit, cached 60 s  |
 | GET, POST         | `/customer-sources`                                | Member                               |
 | PATCH             | `/customer-sources/:id`                            | Member                               |
 | GET, POST, PUT    | `/customers[/:id]`                                 | Member                               |
 | POST              | `/customers/:id/archive`                           | `records:archive`                    |
+| DELETE            | `/customers/:id`                                   | `records:archive`                    |
+| DELETE            | `/labels/:id`, `/customer-sources/:id`             | Member                               |
+| DELETE            | `/companies/current/expense-categories/:id`        | `settings:manage`                    |
 
 ### Inventory and the stock ledger
 
@@ -188,9 +205,9 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
   consumable (screws, magnets, boxes...) in its own unit. Tools are expenses, not stock.
 - Every physical roll or purchase is a separate **lot** with its own quantity and price. Its cost
   per gram (or per unit) is fixed when it is bought and kept as the lot's cost snapshot.
-- Every change goes through an **append-only ledger**: stock in, usage, loss, count corrections and
-  reversals. Rows are never edited or deleted; a wrong entry is fixed by recording its exact opposite,
-  once.
+- Every change goes through a **ledger**: stock in, usage, loss, count corrections and reversals.
+  Rows are never edited; a wrong entry is fixed by recording its exact opposite, once. Rows are only
+  removed together with their item or roll, when that item or roll is deleted as a mistake.
 - Taking stock out is a conditional update in the database (`remaining >= quantity`) inside a
   transaction. A multi-line usage either deducts every line or none, and stock never goes negative,
   even under concurrent requests.
@@ -233,8 +250,8 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 - **Products and services** share one collection: type, name, description, labels, usual price,
   sale unit (per piece, per hour, per job or a custom unit), estimated cost, private notes, and for
   products the size of a typical piece (width × depth × height in mm) and the filament it uses.
-  Quotes and sales start from these values and can change them. The same document will feed the
-  public showcase (Part 4b).
+  Quotes and sales start from these values and can change them. The same document feeds the
+  public showcase.
 - The **estimated cost** is removed from responses for members without financial access, and their
   edits never overwrite it.
 - **Labels** (Keychain, Fridge magnet, Gift...) live inside the company document, not in a
@@ -250,7 +267,52 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
   brought. Sources live inside the company document, like labels. The create dialog is a standalone component, so
   quotes, orders and sales can add a customer without leaving the screen. The customer page links
   straight to WhatsApp, a call or an email.
-- Products and customers are archived, never deleted, so past quotes and sales keep them.
+- Products and customers can be archived (kept for history, hidden from new work) or deleted.
+
+### Deleting records
+
+Anything entered by mistake can be deleted, after a confirmation that says what goes with it.
+Archive (or cancel, for expenses) stays available for records that really happened.
+
+| Record                  | Who                        | What happens to linked data                                                                                                                 |
+| ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stock item or one roll  | `records:archive`          | Its ledger rows go with it. An expense that paid only for it can be deleted too (offered, needs `finance:manage`); a shared one is unlinked |
+| Expense                 | `finance:manage` + archive | Its payments go with it; the rolls it paid for stay, listed again as not recorded in expenses                                               |
+| Product or service      | `records:archive`          | Its photos are deleted from Cloudinary                                                                                                      |
+| Customer                | `records:archive`          | Nothing else points at customers yet                                                                                                        |
+| Label / customer source | Member                     | Taken off the products / customers that carry it                                                                                            |
+| Expense category        | `settings:manage`          | Refused while any expense uses it (archive it instead)                                                                                      |
+| Printer                 | `settings:manage`          | Nothing points at printers yet                                                                                                              |
+
+Every delete is written to the audit log. Stock moved by an order or a sale can't be deleted, only
+archived; quotes, orders and sales (Parts 6 to 8) will add the same guard to the products,
+customers and printers they use.
+
+### Public showcase
+
+- Each business gets a public page at `/s/<link>` with a search, a filter by label, and a page per
+  product (`/s/<link>/<product>`) with a photo gallery, size, filament weight and a WhatsApp button
+  that opens a chat with a ready message ("{product}" becomes the product name). It is set up in
+  the **Showcase** page (sidebar): published or not, link, title, description, language (Portuguese or
+  English), WhatsApp number and message.
+- **No new collection.** Visibility, badge ("Already made" or "Made to order"), "show the price",
+  featured and order live in `products.showcase`; the settings live in the company document. A
+  product gets its link the first time it is shown and keeps it if renamed.
+- **Only an admin** (`showcase:manage`) shows or hides products, changes the order or the
+  settings. Hiding a product never touches quotes, sales or history. Archived products never show.
+- **The public API is built from an allowlist**: name, description, labels, badge, specs, photos,
+  and the price only when chosen. Costs, notes, sales data and internal ids never appear (tests
+  check the exact keys). Unpublished showcases and hidden products answer 404. Responses carry
+  `Cache-Control` (60 s) and an ETag, under their own rate limit.
+- **Images live on Cloudinary**, never in MongoDB, and only their id and facts are stored. The API
+  signs each upload for one exact id, folder and set of formats; the browser sends the file
+  straight to Cloudinary; then the API checks what was stored (folder, format, size) before linking
+  it, and deletes anything that breaks the rules. Removing or replacing an image deletes the file.
+  Folder names are keyed hashes, so public image URLs reveal no company or product id. Sizes come
+  from URL transformations (`f_auto,q_auto`, 400, 800 and 1600 px).
+- **Setup:** create a free Cloudinary account and copy the "API environment variable"
+  (`cloudinary://...`) into `CLOUDINARY_URL` in `apps/api/.env`. Without it, the app runs and the
+  upload slots say storage is not set up.
 
 ### Printer catalog
 
@@ -311,7 +373,7 @@ about a minute to start; the test setup allows for that.
 1. Authentication, companies, members and roles
 2. Web shell, design system and settings
 3. Inventory (spools and lots, stock ledger) and expenses
-4. Catalog and customers (this part) · 4b public showcase · 4c seasonal showcases
+4. Catalog and customers · 4b public showcase (this part) · 4c seasonal showcases
 5. Calculator
 6. Quotes and PDF
 7. Orders and Kanban, stock consumption
@@ -322,13 +384,13 @@ about a minute to start; the test setup allows for that.
 ## Image slots
 
 Places where the business owner uploads their own photos or artwork. Each slot shows its
-recommended size in the app and keeps a placeholder until something is uploaded. Uploads arrive
-with image storage in Part 4b; more slots are added as features are built.
+recommended size in the app and keeps a placeholder until something is uploaded. More slots are
+added as features are built.
 
-| Slot           | Where it appears                                     | Recommended size                       | Format / limit          |
-| -------------- | ---------------------------------------------------- | -------------------------------------- | ----------------------- |
-| Company logo   | Settings, quote PDF header, showcase header          | 512 × 512 (square, transparent)        | PNG, SVG or WebP · 1 MB |
-| Product photos | Product form, showcase grid (cover) and product page | 1600 × 1600 (1:1), up to 8 per product | JPG, WebP or PNG · 5 MB |
+| Slot           | Where it appears                                                      | Recommended size                       | Format / limit          |
+| -------------- | --------------------------------------------------------------------- | -------------------------------------- | ----------------------- |
+| Company logo   | Settings → Business; showcase header (later the quote PDF)            | 512 × 512 (square, transparent)        | PNG, SVG or WebP · 1 MB |
+| Product photos | Product page; showcase grid (first photo = cover) and product gallery | 1600 × 1600 (1:1), up to 8 per product | JPG, WebP or PNG · 5 MB |
 
 ## Data sources
 

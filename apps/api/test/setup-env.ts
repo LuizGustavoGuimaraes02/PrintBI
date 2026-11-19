@@ -4,3 +4,5 @@ process.env.MONGO_URI ??= 'mongodb://placeholder.invalid/printbi-test';
 process.env.CORS_ORIGINS = 'http://localhost:5173';
 process.env.JWT_ACCESS_SECRET = 'test-secret-that-is-long-enough-for-hs256-signing';
 process.env.AUTH_RATE_LIMIT = '10000';
+// A stand-in Cloudinary account; tests stub the HTTP calls it would make.
+process.env.CLOUDINARY_URL = 'cloudinary://test-key:test-secret@printbi-test';

@@ -1,9 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { categoryInputSchema, type CategoryView } from '@printbi/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Badge, Button, Notice, PageLoader, Panel, TextField } from '../../design-system';
-import { api } from '../../lib/api';
+import {
+  Badge,
+  Button,
+  InlineDelete,
+  Notice,
+  PageLoader,
+  Panel,
+  TextField,
+  useToast,
+} from '../../design-system';
+import { api, ApiError } from '../../lib/api';
 import { applyServerErrors } from '../../lib/forms';
 import { useCan } from '../auth/account';
 import { companyBase, keys, useCategories, useSaving } from './queries';
@@ -79,6 +89,8 @@ function NewCategoryForm() {
 }
 
 function CategoryRow({ category, canManage }: { category: CategoryView; canManage: boolean }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(category.name);
   const update = useSaving(
@@ -142,6 +154,20 @@ function CategoryRow({ category, canManage }: { category: CategoryView; canManag
               >
                 {category.archived ? 'Restore' : 'Archive'}
               </Button>
+              <InlineDelete
+                name={category.name}
+                onDelete={async () => {
+                  try {
+                    await api.delete(`${companyBase}/expense-categories/${category.id}`);
+                    await queryClient.invalidateQueries({ queryKey: keys.categories });
+                    toast.success('Category deleted', category.name);
+                  } catch (e) {
+                    // In use: the message says to archive it instead.
+                    toast.error('Not deleted', e instanceof ApiError ? e.message : undefined);
+                    throw e;
+                  }
+                }}
+              />
             </span>
           )}
         </>

@@ -22,3 +22,12 @@ export const apiRateLimit = rateLimit({
   legacyHeaders: false,
   message: { ...tooMany, message: 'Too many requests. Try again in a few minutes.' },
 });
+
+/** Public showcase pages: generous for browsing, still capped against scraping. */
+export const publicRateLimit = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: env.AUTH_RATE_LIMIT * 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { ...tooMany, message: 'Too many requests. Try again in a few minutes.' },
+});

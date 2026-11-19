@@ -1,10 +1,11 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { cn } from './cn';
 
 interface PanelProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  ref?: Ref<HTMLElement>;
 }
 
 /** The white rounded section every screen is built from. */

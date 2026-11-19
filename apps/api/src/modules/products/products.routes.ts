@@ -3,6 +3,9 @@ import {
   objectIdSchema,
   productFiltersSchema,
   productInputSchema,
+  productShowcaseSchema,
+  registerImageSchema,
+  updateImagesSchema,
 } from '@printbi/shared';
 import { Router, type Request } from 'express';
 import { Types } from 'mongoose';
@@ -78,3 +81,72 @@ productsRouter.post(
     );
   },
 );
+
+// Photos: any member who edits the catalog can manage them.
+productsRouter.post('/:productId/images', async (req, res) => {
+  const { auth, finance } = context(req);
+  const { publicId } = parseInput(registerImageSchema, req.body);
+  res
+    .status(201)
+    .json(
+      await service.addProductImage(
+        auth.companyId,
+        auth.userId,
+        id(req.params.productId),
+        publicId,
+        finance,
+      ),
+    );
+});
+
+productsRouter.put('/:productId/images', async (req, res) => {
+  const { auth, finance } = context(req);
+  const input = parseInput(updateImagesSchema, req.body);
+  res.json(
+    await service.updateProductImages(
+      auth.companyId,
+      auth.userId,
+      id(req.params.productId),
+      input,
+      finance,
+    ),
+  );
+});
+
+productsRouter.delete('/:productId/images/:imageId', async (req, res) => {
+  const { auth, finance } = context(req);
+  res.json(
+    await service.removeProductImage(
+      auth.companyId,
+      auth.userId,
+      id(req.params.productId),
+      id(req.params.imageId),
+      finance,
+    ),
+  );
+});
+
+// Whether and how it shows on the public showcase: admin only.
+productsRouter.put(
+  '/:productId/showcase',
+  requirePermission('showcase:manage'),
+  async (req, res) => {
+    const { auth, finance } = context(req);
+    const input = parseInput(productShowcaseSchema, req.body);
+    res.json(
+      await service.setProductShowcase(
+        auth.companyId,
+        auth.userId,
+        id(req.params.productId),
+        input,
+        finance,
+      ),
+    );
+  },
+);
+
+productsRouter.delete('/:productId', requirePermission('records:archive'), async (req, res) => {
+  const { auth } = context(req);
+  await service.deleteProduct(auth.companyId, auth.userId, id(req.params.productId));
+  res.status(204).end();
+});

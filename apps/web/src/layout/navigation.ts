@@ -31,6 +31,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/calculator', label: 'Calculator', icon: Calculator, part: '5' },
   { to: '/quotes', label: 'Quotes', icon: FileText, part: '6' },
   { to: '/customers', label: 'Customers', icon: Users },
-  { to: '/showcase', label: 'Showcase', icon: Store, part: '4b' },
+  { to: '/showcase', label: 'Showcase', icon: Store },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
