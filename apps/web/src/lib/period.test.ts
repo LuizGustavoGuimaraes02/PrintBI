@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rangeFor, rangeQuery } from './period';
+import { localToday, rangeFor, rangeQuery } from './period';
 
 const now = new Date(2026, 10, 18); // 18 Nov 2026
 
@@ -23,5 +23,13 @@ describe('period ranges', () => {
       'from=2026-11-01T00%3A00%3A00&to=2026-11-30T23%3A59%3A59.999',
     );
     expect(rangeFor('all', {}, now)).toEqual({});
+  });
+});
+
+describe('localToday', () => {
+  it('uses the local calendar date, not the UTC one', () => {
+    // 11 pm on Nov 18 local time; in UTC this is often already Nov 19.
+    expect(localToday(new Date(2026, 10, 18, 23, 30))).toBe('2026-11-18');
+    expect(localToday(new Date(2026, 0, 5, 0, 5))).toBe('2026-01-05');
   });
 });

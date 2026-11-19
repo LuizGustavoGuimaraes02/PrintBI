@@ -224,3 +224,11 @@ export const reverseMovementSchema = z.object({
 /** Header every stock-changing request carries, so a retry or double click does nothing. */
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
 export const idempotencyKeySchema = z.string().trim().min(8).max(100);
+
+/** Priced lots that never became an expense (e.g. the switch was off), recorded afterwards. */
+export const recordLotExpensesSchema = purchaseExpenseSchema.extend({
+  lots: z
+    .array(z.object({ itemId: objectIdSchema, lotId: objectIdSchema }))
+    .min(1, 'Choose at least one roll')
+    .max(500),
+});

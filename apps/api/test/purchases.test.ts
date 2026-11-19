@@ -240,3 +240,76 @@ describe('per-roll low-stock warnings', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('rolls registered without an expense', () => {
+  it('lists priced rolls with no expense and records one expense per order', async () => {
+    const { client, companyId } = await registerWithCompany(app);
+    // Two orders saved with the expense switch off, plus one that already has its expense.
+    await purchase(client, {
+      store: 'Amazon',
+      purchasedAt: '2026-11-10',
+      lines: [line('black', 'Black', 2), line('white', 'White')],
+    });
+    await purchase(client, {
+      store: 'Bambu Lab store',
+      purchasedAt: '2026-11-12',
+      lines: [line('hot-pink', 'Hot Pink')],
+    });
+    await purchase(client, {
+      lines: [line('silver', 'Silver')],
+      expense: { categoryId: await filamentCategory(client), paidAt: null },
+    });
+
+    const pending = (await client.get('/api/v1/inventory/unrecorded-lots')).body as {
+      itemId: string;
+      lotId: string;
+      store: string;
+    }[];
+    expect(pending).toHaveLength(4);
+    expect(pending[0]?.store).toBe('Bambu Lab store'); // newest first
+
+    const res = await client.post('/api/v1/inventory/unrecorded-lots/expenses', {
+      lots: pending.map(({ itemId, lotId }) => ({ itemId, lotId })),
+      categoryId: await filamentCategory(client),
+      paidAt: '2026-11-12',
+      method: 'debit',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ expenses: 2, lots: 4 });
+
+    const expenses = await ExpenseModel.find({ companyId }).sort({ purchasedAt: 1 }).lean();
+    expect(expenses).toHaveLength(3);
+    const amazon = expenses.find((e) => e.vendor === 'Amazon');
+    expect(amazon).toMatchObject({
+      description: 'Filament order · 3 rolls',
+      amount: { amount: 60 * G, currency: 'CAD' },
+      status: 'paid',
+    });
+    expect(amazon?.stock).toHaveLength(3);
+    expect((await client.get('/api/v1/inventory/unrecorded-lots')).body).toEqual([]);
+
+    // Sending the same rolls again cannot pay for them twice.
+    const again = await client.post('/api/v1/inventory/unrecorded-lots/expenses', {
+      lots: pending.slice(0, 1).map(({ itemId, lotId }) => ({ itemId, lotId })),
+      categoryId: await filamentCategory(client),
+    });
+    expect(again.status).toBe(409);
+    expect(await ExpenseModel.countDocuments({ companyId })).toBe(3);
+  });
+
+  it('needs financial access and stays inside the company', async () => {
+    const admin = await registerWithCompany(app);
+    const employee = await addEmployee(app, admin.client, false);
+    const other = await registerWithCompany(app, 'Other Lab');
+    await purchase(employee.client, { lines: [line('black', 'Black')] });
+
+    expect((await employee.client.get('/api/v1/inventory/unrecorded-lots')).status).toBe(403);
+    const pending = (await admin.client.get('/api/v1/inventory/unrecorded-lots')).body;
+    expect(pending).toHaveLength(1); // the employee's roll waits for the admin
+    const foreign = await other.client.post('/api/v1/inventory/unrecorded-lots/expenses', {
+      lots: [{ itemId: pending[0].itemId, lotId: pending[0].lotId }],
+      categoryId: await filamentCategory(other.client),
+    });
+    expect(foreign.status).toBe(404);
+  });
+});

@@ -19,6 +19,7 @@ import { showGrams, showQuantity } from '../../lib/quantity';
 import { useCan } from '../auth/account';
 import { ConsumeDialog } from './ConsumeDialog';
 import { useInventoryItems, useInventorySummary, type ItemFilters } from './queries';
+import { UnrecordedExpensesNotice } from './UnrecordedExpenses';
 
 const KINDS: { value: ItemFilters['kind']; label: string }[] = [
   { value: '', label: 'All' },
@@ -207,6 +208,7 @@ export function InventoryPage() {
           </>
         }
       />
+      <UnrecordedExpensesNotice />
       <Summary />
 
       <section

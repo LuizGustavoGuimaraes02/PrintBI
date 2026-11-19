@@ -5,11 +5,30 @@ import { renderWithApp } from '../../test/render';
 import { CustomerDialog } from './CustomerDialog';
 import { whatsappLink } from './queries';
 
+const SOURCES = [
+  { id: 'ccccccccccccccccccccccc1', name: 'WhatsApp', archived: false, customerCount: 2 },
+  { id: 'ccccccccccccccccccccccc2', name: 'Referral', archived: false, customerCount: 1 },
+];
+
 function mockApi() {
   const calls: { url: string; init: RequestInit }[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {
+      if (url === '/api/v1/customer-sources' && init.method !== 'POST')
+        return new Response(JSON.stringify(SOURCES));
+      if (url === '/api/v1/customer-sources') {
+        calls.push({ url, init });
+        return new Response(
+          JSON.stringify({
+            id: 'ccccccccccccccccccccccc9',
+            name: 'Flyer',
+            archived: false,
+            customerCount: 0,
+          }),
+          { status: 201 },
+        );
+      }
       calls.push({ url, init });
       const body = JSON.parse(String(init.body ?? '{}')) as object;
       return new Response(
@@ -53,6 +72,35 @@ describe('CustomerDialog', () => {
       phone: '+55 11 98888-7777',
       email: '',
     });
+  });
+});
+
+describe('CustomerDialog sources', () => {
+  it('records where the customer came from', async () => {
+    const calls = mockApi();
+    renderWithApp(<CustomerDialog initialName="Ana" onClose={vi.fn()} />);
+    await screen.findByRole('option', { name: 'Referral' });
+    await userEvent.selectOptions(screen.getByLabelText('Came from'), 'Referral');
+    await userEvent.type(screen.getByLabelText('Source details'), 'Referred by Maria');
+    await userEvent.click(screen.getByRole('button', { name: 'Add customer' }));
+    await waitFor(() => expect(calls.some((c) => c.url === '/api/v1/customers')).toBe(true));
+    const post = calls.find((c) => c.url === '/api/v1/customers');
+    expect(JSON.parse(String(post?.init.body))).toMatchObject({
+      sourceId: 'ccccccccccccccccccccccc2',
+      sourceDetail: 'Referred by Maria',
+    });
+  });
+
+  it('adds a new source on the spot and selects it', async () => {
+    const calls = mockApi();
+    renderWithApp(<CustomerDialog initialName="Ana" onClose={vi.fn()} />);
+    await screen.findByRole('option', { name: 'WhatsApp' });
+    await userEvent.selectOptions(screen.getByLabelText('Came from'), '+ New source…');
+    await userEvent.type(screen.getByLabelText('New source'), 'Flyer{Enter}');
+    await waitFor(() => expect(calls.some((c) => c.url === '/api/v1/customer-sources')).toBe(true));
+    const created = calls.find((c) => c.url === '/api/v1/customer-sources');
+    expect(JSON.parse(String(created?.init.body))).toEqual({ name: 'Flyer' });
+    await waitFor(() => expect(screen.queryByLabelText('New source')).not.toBeInTheDocument());
   });
 });
 

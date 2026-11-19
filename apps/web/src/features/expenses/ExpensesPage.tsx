@@ -15,6 +15,7 @@ import { PERIODS, rangeFor, type PeriodKey, type Range } from '../../lib/period'
 import { useCan } from '../auth/account';
 import { useCategories } from '../settings/queries';
 import { useExpenses, useExpenseSummary, type ExpenseFilters } from './queries';
+import { UnrecordedExpensesNotice } from '../inventory/UnrecordedExpenses';
 
 const dateFormat = new Intl.DateTimeFormat('en-CA', { dateStyle: 'medium', timeZone: 'UTC' });
 
@@ -105,6 +106,7 @@ function Expenses() {
           )
         }
       />
+      <UnrecordedExpensesNotice />
 
       <div className="flex flex-wrap items-end gap-3 px-1">
         <SelectField

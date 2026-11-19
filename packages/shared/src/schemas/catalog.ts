@@ -96,13 +96,30 @@ export const customerInputSchema = z.object({
   email: z.union([emailSchema, z.literal('')]).default(''),
   address: text(300),
   notes: text(2000),
+  /** Where the customer came from (WhatsApp, Referral, Instagram...). */
+  sourceId: objectIdSchema.nullable().default(null),
+  /** Optional detail, e.g. who referred them. */
+  sourceDetail: text(120),
 });
 export type CustomerInput = z.input<typeof customerInputSchema>;
 
 export const customerFiltersSchema = z.object({
   q: z.string().trim().max(100).optional(),
+  /** A source id, or "none" for customers without one. */
+  sourceId: z.union([objectIdSchema, z.literal('none')]).optional(),
   archived: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
 });
+
+/** Starting list of customer sources; each business renames, archives or adds its own. */
+export const DEFAULT_CUSTOMER_SOURCES = ['WhatsApp', 'Referral', 'Instagram'] as const;
+
+export const customerSourceInputSchema = z.object({
+  name: z.string().trim().min(1, 'Name the source').max(40),
+});
+
+export const updateCustomerSourceSchema = z
+  .object({ name: customerSourceInputSchema.shape.name, archived: z.boolean() })
+  .partial();

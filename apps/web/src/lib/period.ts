@@ -46,3 +46,12 @@ export function rangeQuery(range: Range): URLSearchParams {
   if (range.to) params.set('to', `${range.to}T23:59:59.999`);
   return params;
 }
+
+/**
+ * Today's date as YYYY-MM-DD on the user's own calendar. `toISOString()` would give the UTC
+ * date, which is already tomorrow in the evening across the Americas.
+ */
+export function localToday(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}

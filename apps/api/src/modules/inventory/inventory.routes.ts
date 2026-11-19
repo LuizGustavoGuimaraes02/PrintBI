@@ -7,6 +7,7 @@ import {
   lotInputSchema,
   objectIdSchema,
   purchaseSchema,
+  recordLotExpensesSchema,
   reverseMovementSchema,
   updateLotSchema,
 } from '@printbi/shared';
@@ -150,6 +151,20 @@ inventoryRouter.post('/movements/:movementId/reverse', async (req, res) => {
   );
   created(res, replayed, item);
 });
+
+/** Priced rolls that are not in Costs & Expenses yet. */
+inventoryRouter.get('/unrecorded-lots', requirePermission('finance:manage'), async (req, res) => {
+  res.json(await service.listUnrecordedLots(actor(req)));
+});
+
+inventoryRouter.post(
+  '/unrecorded-lots/expenses',
+  requirePermission('finance:manage'),
+  async (req, res) => {
+    const input = parseInput(recordLotExpensesSchema, req.body);
+    res.status(201).json(await service.recordLotExpenses(actor(req), input));
+  },
+);
 
 inventoryRouter.post('/purchases', async (req, res) => {
   const input = parseInput(purchaseSchema, req.body);

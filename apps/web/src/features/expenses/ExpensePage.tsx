@@ -17,6 +17,7 @@ import {
   useToast,
 } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
+import { localToday } from '../../lib/period';
 import { useIdempotencyKey } from '../../lib/useIdempotencyKey';
 import { useCan } from '../auth/account';
 import { NoFinanceAccess, STATUS_BADGE } from './ExpensesPage';
@@ -226,7 +227,7 @@ function PaymentDialog({ expense, onClose }: { expense: ExpenseView; onClose: ()
   const refresh = useRefreshExpenses();
   const idempotency = useIdempotencyKey();
   const [amount, setAmount] = useState(String(expense.outstanding / 1_000_000));
-  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10));
+  const [paidAt, setPaidAt] = useState(localToday);
   const [method, setMethod] = useState('credit');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

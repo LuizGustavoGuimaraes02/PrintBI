@@ -1,15 +1,18 @@
-import type { CustomerView } from '@printbi/shared';
+import type { CustomerSourceView, CustomerView } from '@printbi/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
 export interface CustomerFilters {
   q?: string;
+  /** A source id, or "none" for customers without one. */
+  sourceId?: string;
   archived?: boolean;
 }
 
 const query = (filters: CustomerFilters) => {
   const params = new URLSearchParams();
   if (filters.q?.trim()) params.set('q', filters.q.trim());
+  if (filters.sourceId) params.set('sourceId', filters.sourceId);
   if (filters.archived) params.set('archived', 'true');
   const text = params.toString();
   return text ? `?${text}` : '';
@@ -19,6 +22,7 @@ export const customerKeys = {
   all: ['customers'] as const,
   list: (filters: CustomerFilters) => ['customers', 'list', filters] as const,
   one: (id: string) => ['customers', 'one', id] as const,
+  sources: ['customers', 'sources'] as const,
 };
 
 export const useCustomers = (filters: CustomerFilters = {}) =>
@@ -34,6 +38,13 @@ export const useCustomer = (id: string) =>
     queryFn: () => api.get<CustomerView>(`/customers/${id}`),
   });
 
+export const useCustomerSources = () =>
+  useQuery({
+    queryKey: customerKeys.sources,
+    queryFn: () => api.get<CustomerSourceView[]>('/customer-sources'),
+  });
+
+/** Lists, details and source counts change together. */
 export function useRefreshCustomers() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: customerKeys.all });

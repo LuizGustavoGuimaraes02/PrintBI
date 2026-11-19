@@ -1,9 +1,10 @@
 import { customerInputSchema, type CustomerView } from '@printbi/shared';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { Button, Modal, Notice, TextAreaField, TextField, useToast } from '../../design-system';
 import { api } from '../../lib/api';
 import { applyServerErrors, formResolver } from '../../lib/forms';
 import { useRefreshCustomers } from './queries';
+import { SourceField } from './SourceField';
 
 interface CustomerForm {
   name: string;
@@ -12,9 +13,20 @@ interface CustomerForm {
   email: string;
   address: string;
   notes: string;
+  sourceId: string | null;
+  sourceDetail: string;
 }
 
-const EMPTY: CustomerForm = { name: '', company: '', phone: '', email: '', address: '', notes: '' };
+const EMPTY: CustomerForm = {
+  name: '',
+  company: '',
+  phone: '',
+  email: '',
+  address: '',
+  notes: '',
+  sourceId: null,
+  sourceDetail: '',
+};
 
 interface CustomerDialogProps {
   /** Editing an existing customer; omit to create one. */
@@ -37,7 +49,7 @@ export function CustomerDialog({
 }: CustomerDialogProps) {
   const toast = useToast();
   const refresh = useRefreshCustomers();
-  const { register, handleSubmit, setError, formState } = useForm<CustomerForm>({
+  const { register, handleSubmit, setError, formState, control } = useForm<CustomerForm>({
     defaultValues: customer
       ? {
           name: customer.name,
@@ -46,6 +58,8 @@ export function CustomerDialog({
           email: customer.email,
           address: customer.address,
           notes: customer.notes,
+          sourceId: customer.source?.id ?? null,
+          sourceDetail: customer.sourceDetail,
         }
       : { ...EMPTY, name: initialName },
     resolver: formResolver<CustomerForm>(customerInputSchema),
@@ -119,6 +133,24 @@ export function CustomerDialog({
           error={errors.email?.message}
           {...register('email')}
         />
+        <Controller
+          control={control}
+          name="sourceId"
+          render={({ field, fieldState }) => (
+            <SourceField
+              value={field.value}
+              onChange={field.onChange}
+              error={fieldState.error?.message}
+            />
+          )}
+        />
+        <TextField
+          label="Source details"
+          autoComplete="off"
+          placeholder="e.g. referred by Maria"
+          error={errors.sourceDetail?.message}
+          {...register('sourceDetail')}
+        />
         <TextField
           label="Address"
           autoComplete="off"
@@ -130,7 +162,7 @@ export function CustomerDialog({
           label="Notes"
           rows={3}
           className="sm:col-span-2"
-          hint="Preferences, delivery details, how they found you."
+          hint="Preferences, delivery details, anything worth remembering."
           error={errors.notes?.message}
           {...register('notes')}
         />

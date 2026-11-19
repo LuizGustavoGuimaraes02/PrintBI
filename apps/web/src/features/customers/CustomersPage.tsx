@@ -1,10 +1,11 @@
 import type { CustomerView } from '@printbi/shared';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { Plus, Signpost, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import {
   Badge,
   Button,
+  cn,
   EmptyState,
   PageHeader,
   PageLoader,
@@ -12,7 +13,34 @@ import {
   TextField,
 } from '../../design-system';
 import { CustomerDialog } from './CustomerDialog';
-import { useCustomers, type CustomerFilters } from './queries';
+import { ManageSourcesDialog } from './ManageSourcesDialog';
+import { useCustomers, useCustomerSources, type CustomerFilters } from './queries';
+
+const NO_FILTERS: CustomerFilters = { q: '', sourceId: '', archived: false };
+
+function Chip({
+  on,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold whitespace-nowrap',
+        on ? 'bg-ink text-white' : 'bg-bench text-ink hover:bg-rule-soft',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 function CustomerRow({ customer }: { customer: CustomerView }) {
   const contact = [customer.phone, customer.email].filter(Boolean);
@@ -27,8 +55,12 @@ function CustomerRow({ customer }: { customer: CustomerView }) {
             <strong className="text-[16px]">{customer.name}</strong>
             {customer.archived && <Badge>Archived</Badge>}
           </span>
-          {customer.company && (
-            <span className="truncate text-[13px] text-ink-muted">{customer.company}</span>
+          {(customer.company || customer.source) && (
+            <span className="truncate text-[13px] text-ink-muted">
+              {[customer.company, customer.source && `via ${customer.source.name}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
           )}
         </span>
         <span className="figure flex flex-col gap-0.5 text-[13px] text-ink-muted sm:items-end">
@@ -45,12 +77,15 @@ function CustomerRow({ customer }: { customer: CustomerView }) {
 
 export function CustomersPage() {
   const navigate = useNavigate();
-  const [filters, setFilters] = useState<CustomerFilters>({ q: '', archived: false });
+  const [filters, setFilters] = useState<CustomerFilters>(NO_FILTERS);
   const [adding, setAdding] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const { data: sources } = useCustomerSources();
   const { data: customers, isPending, isFetching } = useCustomers(filters);
   // A cached empty list may be stale (e.g. right after adding one): wait for the refetch.
   const refetchingEmpty = isFetching && customers?.length === 0;
-  const filtered = Boolean(filters.q || filters.archived);
+  const filtered = Boolean(filters.q || filters.sourceId || filters.archived);
+  const activeSources = sources?.filter((src) => !src.archived) ?? [];
 
   return (
     <>
@@ -59,9 +94,18 @@ export function CustomersPage() {
         title="Customers"
         description="Who buys from you, how to reach them, and what they have ordered."
         actions={
-          <Button icon={<Plus size={18} aria-hidden="true" />} onClick={() => setAdding(true)}>
-            Add customer
-          </Button>
+          <>
+            <Button
+              variant="soft"
+              icon={<Signpost size={18} aria-hidden="true" />}
+              onClick={() => setManaging(true)}
+            >
+              Sources
+            </Button>
+            <Button icon={<Plus size={18} aria-hidden="true" />} onClick={() => setAdding(true)}>
+              Add customer
+            </Button>
+          </>
         }
       />
       <section
@@ -87,6 +131,33 @@ export function CustomersPage() {
           </SelectField>
         </div>
 
+        {activeSources.length > 0 && (
+          <div role="group" aria-label="Filter by source" className="flex flex-wrap gap-2">
+            <Chip
+              on={!filters.sourceId}
+              onClick={() => setFilters((f) => ({ ...f, sourceId: '' }))}
+            >
+              Any source
+            </Chip>
+            {activeSources.map((src) => (
+              <Chip
+                key={src.id}
+                on={filters.sourceId === src.id}
+                onClick={() => setFilters((f) => ({ ...f, sourceId: src.id }))}
+              >
+                {src.name}
+                <span className="figure text-[12px] opacity-70">{src.customerCount}</span>
+              </Chip>
+            ))}
+            <Chip
+              on={filters.sourceId === 'none'}
+              onClick={() => setFilters((f) => ({ ...f, sourceId: 'none' }))}
+            >
+              Not set
+            </Chip>
+          </div>
+        )}
+
         {(isPending || refetchingEmpty) && <PageLoader label="Loading customers" />}
         {customers && customers.length === 0 && !refetchingEmpty && (
           <EmptyState
@@ -96,7 +167,7 @@ export function CustomersPage() {
                 <Button
                   variant="soft"
                   icon={<SlidersHorizontal size={16} aria-hidden="true" />}
-                  onClick={() => setFilters({ q: '', archived: false })}
+                  onClick={() => setFilters(NO_FILTERS)}
                 >
                   Clear filters
                 </Button>
@@ -106,7 +177,7 @@ export function CustomersPage() {
             }
           >
             {filtered
-              ? 'Try another name, phone or email.'
+              ? 'Try another search, source or status.'
               : 'Customers can also be added on the spot while writing a quote or a sale.'}
           </EmptyState>
         )}
@@ -125,6 +196,7 @@ export function CustomersPage() {
           onSaved={(c) => void navigate(`/customers/${c.id}`)}
         />
       )}
+      {managing && <ManageSourcesDialog onClose={() => setManaging(false)} />}
     </>
   );
 }

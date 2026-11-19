@@ -69,6 +69,7 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
     ['Phone', customer.phone],
     ['Email', customer.email],
     ['Address', customer.address],
+    ['Came from', [customer.source?.name, customer.sourceDetail].filter(Boolean).join(' · ')],
   ];
 
   return (

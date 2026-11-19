@@ -13,6 +13,7 @@ import { logger } from './core/logger';
 import { authRouter } from './modules/auth/auth.routes';
 import { companiesRouter } from './modules/companies/companies.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { customerSourcesRouter } from './modules/customer-sources/customer-sources.routes';
 import { customersRouter } from './modules/customers/customers.routes';
 import { expensesRouter } from './modules/expenses/expenses.routes';
 import { filamentCatalogRouter } from './modules/filament-catalog/filament-catalog.routes';
@@ -64,6 +65,7 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/labels', labelsRouter);
   api.use('/products', productsRouter);
   api.use('/customers', customersRouter);
+  api.use('/customer-sources', customerSourcesRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

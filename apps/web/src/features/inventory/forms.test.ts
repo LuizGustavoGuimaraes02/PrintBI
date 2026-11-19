@@ -19,7 +19,8 @@ describe('inventory forms', () => {
     expect(payload.firstLot).toMatchObject({
       remaining: '1000',
       totalCost: { amount: '25', currency: 'CAD' },
-      expense: null,
+      // New purchases go to Costs & Expenses unless the switch is turned off.
+      expense: { categoryId: '0123456789abcdef01234567', method: 'credit' },
     });
   });
 

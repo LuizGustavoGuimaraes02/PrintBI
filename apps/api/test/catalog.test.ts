@@ -250,3 +250,76 @@ describe('customers', () => {
     expect((await other.client.post(url, { archived: false })).status).toBe(404);
   });
 });
+
+describe('customer sources', () => {
+  type Source = { id: string; name: string; archived: boolean; customerCount: number };
+  const sources = async (client: TestClient) =>
+    (await client.get('/api/v1/customer-sources')).body as Source[];
+
+  it('starts every business with WhatsApp, Referral and Instagram, once', async () => {
+    const { client } = await registerWithCompany(app);
+    const [first, second] = await Promise.all([sources(client), sources(client)]);
+    expect(first.map((s) => s.name)).toEqual(['WhatsApp', 'Referral', 'Instagram']);
+    expect(second.map((s) => s.id)).toEqual(first.map((s) => s.id));
+    expect(await sources(client)).toHaveLength(3);
+  });
+
+  it('adds new sources, refuses duplicates, and counts customers per source', async () => {
+    const { client } = await registerWithCompany(app);
+    const [whatsapp, referral] = await sources(client);
+    const flyer = (await client.post('/api/v1/customer-sources', { name: 'Flyer' })).body as Source;
+    expect((await client.post('/api/v1/customer-sources', { name: 'instagram' })).status).toBe(409);
+
+    const ana = await client.post('/api/v1/customers', {
+      name: 'Ana',
+      sourceId: referral?.id,
+      sourceDetail: 'Referred by Maria',
+    });
+    expect(ana.body).toMatchObject({
+      source: { id: referral?.id, name: 'Referral' },
+      sourceDetail: 'Referred by Maria',
+    });
+    await client.post('/api/v1/customers', { name: 'Bruno', sourceId: whatsapp?.id });
+    await client.post('/api/v1/customers', { name: 'Carla', sourceId: whatsapp?.id });
+    await client.post('/api/v1/customers', { name: 'Davi', sourceId: flyer.id });
+    await client.post('/api/v1/customers', { name: 'Eva' });
+
+    const counts = Object.fromEntries(
+      (await sources(client)).map((s) => [s.name, s.customerCount]),
+    );
+    expect(counts).toEqual({ WhatsApp: 2, Referral: 1, Instagram: 0, Flyer: 1 });
+
+    const names = async (sourceId: string) =>
+      ((await client.get(`/api/v1/customers?sourceId=${sourceId}`)).body as { name: string }[]).map(
+        (c) => c.name,
+      );
+    expect(await names(whatsapp?.id ?? '')).toEqual(['Bruno', 'Carla']);
+    expect(await names('none')).toEqual(['Eva']);
+  });
+
+  it('keeps an archived source on customers that have it, but not on new ones', async () => {
+    const a = await registerWithCompany(app);
+    const b = await registerWithCompany(app, 'Other Lab');
+    const [whatsapp] = await sources(a.client);
+    const customer = (
+      await a.client.post('/api/v1/customers', { name: 'Ana', sourceId: whatsapp?.id })
+    ).body;
+    await a.client.patch(`/api/v1/customer-sources/${whatsapp?.id}`, { archived: true });
+
+    const edited = await a.client.put(`/api/v1/customers/${customer.id}`, {
+      name: 'Ana Souza',
+      sourceId: whatsapp?.id,
+    });
+    expect(edited.status).toBe(200);
+    expect(edited.body.source.name).toBe('WhatsApp');
+    const fresh = await a.client.post('/api/v1/customers', { name: 'Bia', sourceId: whatsapp?.id });
+    expect(fresh.status).toBe(400);
+    expect(fresh.body.details).toEqual([{ path: 'sourceId', message: 'Choose an active source' }]);
+
+    // Another business's source is unknown here.
+    const [foreign] = await sources(b.client);
+    expect(
+      (await a.client.post('/api/v1/customers', { name: 'Caio', sourceId: foreign?.id })).status,
+    ).toBe(400);
+  });
+});

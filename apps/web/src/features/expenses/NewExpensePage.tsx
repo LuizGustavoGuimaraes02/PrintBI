@@ -14,6 +14,7 @@ import {
 } from '../../design-system';
 import { api } from '../../lib/api';
 import { applyMappedServerErrors, checkPayload } from '../../lib/forms';
+import { localToday } from '../../lib/period';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
 import { useCan } from '../auth/account';
 import { useCategories, useSettings } from '../settings/queries';
@@ -35,7 +36,7 @@ interface ExpenseForm {
   method: 'cash' | 'credit' | 'debit' | 'transfer' | 'other';
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localToday;
 
 export function NewExpensePage() {
   const canManage = useCan('finance:manage');

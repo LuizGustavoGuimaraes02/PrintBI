@@ -164,6 +164,8 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | PATCH             | `/inventory/items/:id/lots/:lotId`                 | Member (price needs finance)         |
 | POST              | `/inventory/items/:id/lots/:lotId/adjust`          | Member · Idempotency-Key             |
 | POST              | `/inventory/purchases`                             | Member · Idempotency-Key             |
+| GET               | `/inventory/unrecorded-lots`                       | `finance:manage`                     |
+| POST              | `/inventory/unrecorded-lots/expenses`              | `finance:manage`                     |
 | POST              | `/inventory/consumptions`                          | Member · Idempotency-Key             |
 | POST              | `/inventory/movements/:id/reverse`                 | Member · Idempotency-Key             |
 | POST              | `/inventory/items/:id/archive`                     | `records:archive`                    |
@@ -175,6 +177,8 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | PATCH             | `/labels/:id`                                      | Member                               |
 | GET, POST, PUT    | `/products[/:id]`                                  | Member (cost needs `finance:view`)   |
 | POST              | `/products/:id/archive`                            | `records:archive`                    |
+| GET, POST         | `/customer-sources`                                | Member                               |
+| PATCH             | `/customer-sources/:id`                            | Member                               |
 | GET, POST, PUT    | `/customers[/:id]`                                 | Member                               |
 | POST              | `/customers/:id/archive`                           | `records:archive`                    |
 
@@ -192,6 +196,11 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
   even under concurrent requests.
 - Every stock-changing request carries an `Idempotency-Key`. Replays and double clicks answer with
   the original result (`Idempotent-Replayed: true`) instead of writing twice.
+- Every purchase is recorded in Costs & Expenses by default (one linked expense, in the same
+  transaction); the switch is turned off only for stock owned before using the app. Priced rolls
+  that still have no expense (switch turned off, or registered by a member without financial
+  access) are listed on Inventory and Costs & Expenses, and can be recorded afterwards: rolls
+  bought on the same day at the same store become one expense.
 - Recording a purchase as an expense creates one linked expense in the same transaction. A unique
   index on the lots it paid for makes a duplicate impossible. Stock bought before using the app needs
   no expense.
@@ -234,7 +243,11 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
   ignoring case. Archiving a label keeps it on the products that already carry it, but it can't be
   added to new ones.
 - **Customers** need only a name; company, phone or WhatsApp, email, address and notes are optional.
-  Search covers name, company, phone and email. The create dialog is a standalone component, so
+  Search covers name, company, phone and email.
+- Each customer can record **where they came from**. Every business starts with WhatsApp, Referral
+  and Instagram and adds its own (Facebook, Flyer...) from the customer form; a detail field holds
+  who referred them. The customer list filters by source and shows how many customers each one
+  brought. Sources live inside the company document, like labels. The create dialog is a standalone component, so
   quotes, orders and sales can add a customer without leaving the screen. The customer page links
   straight to WhatsApp, a call or an email.
 - Products and customers are archived, never deleted, so past quotes and sales keep them.

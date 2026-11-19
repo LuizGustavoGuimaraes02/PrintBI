@@ -170,7 +170,7 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
     defaultValues: {
       purchasedAt: today(),
       store: '',
-      recordExpense: false,
+      recordExpense: true,
       expenseCategoryId: defaultExpenseCategory(categories, 'filament'),
       paymentState: 'paid',
       paidAt: today(),
@@ -529,8 +529,8 @@ export function FilamentPurchase({ currency, categories, products }: FilamentPur
           {canManageFinance && (
             <div className="flex flex-col gap-4 rounded-[var(--radius-tile)] bg-bench p-5">
               <SwitchField
-                label="Also record the purchase as one expense"
-                description={`One expense for the whole order${totals.money.length ? ` (${totals.money.join(' + ')})` : ''}, linked to every roll.`}
+                label="Record in Costs & Expenses"
+                description={`One expense for the whole order${totals.money.length ? ` (${totals.money.join(' + ')})` : ''}, linked to every roll. Turn off only for stock you already had before PrintBI.`}
                 checked={Boolean(detailValues.recordExpense)}
                 onCheckedChange={(checked) =>
                   details.setValue('recordExpense', checked, { shouldDirty: true })

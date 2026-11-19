@@ -121,8 +121,8 @@ export function LotFields({ form, kind, unit, canManageFinance, categories }: Lo
       {canManageFinance && (
         <div className="flex flex-col gap-4 rounded-[var(--radius-tile)] bg-bench p-5">
           <SwitchField
-            label="Also record this purchase as an expense"
-            description="One linked expense, never a duplicate. Leave it off for stock bought before using PrintBI."
+            label="Record in Costs & Expenses"
+            description="One linked expense, never a duplicate. Turn off only for stock you already had before PrintBI."
             checked={lot.recordExpense}
             onCheckedChange={(checked) =>
               setValue('lot.recordExpense', checked, { shouldDirty: true })

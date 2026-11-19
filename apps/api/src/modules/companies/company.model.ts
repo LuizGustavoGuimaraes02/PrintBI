@@ -95,6 +95,12 @@ const labelSchema = new Schema({
   archivedAt: { type: Date, default: null },
 });
 
+/** Where customers come from (WhatsApp, Referral, Instagram...). */
+const customerSourceSchema = new Schema({
+  name: { type: String, required: true, trim: true },
+  archivedAt: { type: Date, default: null },
+});
+
 const categorySchema = new Schema({
   name: { type: String, required: true, trim: true },
   archivedAt: { type: Date, default: null },
@@ -125,6 +131,7 @@ const companySchema = new Schema(
     settings: { type: settingsSchema, default: () => ({}) },
     printers: { type: [printerSchema], default: [] },
     labels: { type: [labelSchema], default: [] },
+    customerSources: { type: [customerSourceSchema], default: [] },
     expenseCategories: {
       type: [categorySchema],
       default: () => DEFAULT_EXPENSE_CATEGORIES.map((name) => ({ name })),

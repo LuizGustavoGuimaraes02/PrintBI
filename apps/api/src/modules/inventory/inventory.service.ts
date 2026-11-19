@@ -10,14 +10,23 @@ import {
   type itemInputSchema,
   type lotInputSchema,
   type purchaseSchema,
+  type recordLotExpensesSchema,
+  type UnrecordedLotView,
   type Money,
   type StockMovementView,
   type updateLotSchema,
 } from '@printbi/shared';
-import { Types, type ClientSession } from 'mongoose';
+import mongoose, { Types, type ClientSession } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
-import { AppError, ForbiddenError, NotFoundError, ValidationError } from '../../core/errors';
+import {
+  AppError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../../core/errors';
+import { isDuplicateKey } from '../../core/http/idempotency';
 import { CompanyModel } from '../companies/company.model';
 import { createExpense } from '../expenses/expenses.service';
 import { filamentProductExists } from '../filament-catalog/filament-catalog.service';
@@ -1070,4 +1079,153 @@ export async function recordPurchase(
     _id: { $in: result },
   }).lean()) as unknown as ItemRecord[];
   return { items: items.map((item) => itemView(item, actor.canSeeFinance, limit)), replayed };
+}
+
+/** Priced lots of active items that no expense covers yet, newest purchase first. */
+export async function listUnrecordedLots(actor: Actor): Promise<UnrecordedLotView[]> {
+  const items = await InventoryItemModel.find(
+    {
+      companyId: actor.companyId,
+      archivedAt: null,
+      lots: { $elemMatch: { expenseId: null, totalCost: { $ne: null } } },
+    },
+    { name: 1, kind: 1, lots: 1 },
+  ).lean();
+  return items
+    .flatMap((item) =>
+      item.lots
+        .filter((lot) => !lot.expenseId && lot.totalCost)
+        .map((lot) => ({
+          itemId: item._id.toString(),
+          lotId: lot._id.toString(),
+          itemName: item.name,
+          kind: item.kind as UnrecordedLotView['kind'],
+          lotLabel: lot.label,
+          purchasedAt: lot.purchasedAt ? lot.purchasedAt.toISOString() : null,
+          store: lot.store ?? '',
+          totalCost: {
+            amount: lot.totalCost?.amount ?? 0,
+            currency: lot.totalCost?.currency ?? 'CAD',
+          },
+        })),
+    )
+    .sort((a, b) => (b.purchasedAt ?? '').localeCompare(a.purchasedAt ?? ''));
+}
+
+/** Lots bought together (same day, store and currency) belong to one expense. */
+export const purchaseGroupKey = (lot: {
+  purchasedAt: Date | string | null;
+  store: string;
+  currency: string;
+}) => {
+  const day = lot.purchasedAt ? new Date(lot.purchasedAt).toISOString().slice(0, 10) : 'undated';
+  return `${day}|${lot.store.trim().toLowerCase()}|${lot.currency}`;
+};
+
+/**
+ * Records expenses for priced lots that have none, one expense per purchase group, in a
+ * single transaction. The unique index on `stock.lotId` keeps a lot from being paid twice.
+ */
+export async function recordLotExpenses(
+  actor: Actor,
+  input: z.output<typeof recordLotExpensesSchema>,
+): Promise<{ expenses: number; lots: number }> {
+  const unique = [...new Map(input.lots.map((l) => [l.lotId, l])).values()];
+  try {
+    return await mongoose.connection.transaction(async (session) => {
+      const items = await InventoryItemModel.find(
+        {
+          companyId: actor.companyId,
+          _id: { $in: unique.map((l) => new Types.ObjectId(l.itemId)) },
+        },
+        { name: 1, kind: 1, lots: 1 },
+      )
+        .session(session)
+        .lean();
+      const byId = new Map(items.map((i) => [i._id.toString(), i]));
+      const groups = new Map<
+        string,
+        {
+          lots: { itemId: Types.ObjectId; lotId: Types.ObjectId }[];
+          names: string[];
+          filament: boolean;
+          amount: number;
+          currency: Money['currency'];
+          purchasedAt: Date | null;
+          store: string;
+        }
+      >();
+
+      unique.forEach(({ itemId, lotId }, index) => {
+        const item = byId.get(itemId);
+        const lot = item?.lots.find((l) => l._id.toString() === lotId);
+        if (!item || !lot) throw new NotFoundError('Stock lot');
+        if (lot.expenseId)
+          throw new ConflictError(`${item.name} · ${lot.label} already has an expense`);
+        if (!lot.totalCost) {
+          throw new ValidationError('Some fields are invalid', [
+            { path: `lots.${index}`, message: 'This roll has no price' },
+          ]);
+        }
+        const currency = lot.totalCost.currency as Money['currency'];
+        const key = purchaseGroupKey({
+          purchasedAt: lot.purchasedAt ?? null,
+          store: lot.store ?? '',
+          currency,
+        });
+        const group = groups.get(key) ?? {
+          lots: [],
+          names: [],
+          filament: true,
+          amount: 0,
+          currency,
+          purchasedAt: lot.purchasedAt ?? null,
+          store: lot.store ?? '',
+        };
+        group.lots.push({ itemId: item._id, lotId: lot._id });
+        group.names.push(`${item.name} · ${lot.label}`);
+        group.filament &&= item.kind === 'filament';
+        group.amount += lot.totalCost.amount;
+        groups.set(key, group);
+      });
+
+      const ctx: LedgerContext = {
+        companyId: actor.companyId,
+        actorId: actor.userId,
+        groupKey: '',
+        session,
+      };
+      for (const group of groups.values()) {
+        const count = group.lots.length;
+        await recordPurchaseExpense(ctx, {
+          description:
+            count === 1
+              ? (group.names[0] ?? 'Stock purchase')
+              : group.filament
+                ? `Filament order · ${count} rolls`
+                : `Stock purchase · ${count} lots`,
+          expense: { categoryId: input.categoryId, paidAt: input.paidAt, method: input.method },
+          amount: { amount: group.amount, currency: group.currency },
+          purchasedAt: group.purchasedAt,
+          vendor: group.store,
+          lots: group.lots,
+        });
+      }
+      await audit(
+        {
+          companyId: actor.companyId,
+          actorId: actor.userId,
+          action: 'inventory.expenses_recorded',
+          entity: 'inventory_item',
+          entityId: unique[0] ? new Types.ObjectId(unique[0].itemId) : actor.companyId,
+          changes: { expenses: groups.size, lots: unique.length },
+        },
+        session,
+      );
+      return { expenses: groups.size, lots: unique.length };
+    });
+  } catch (error) {
+    if (isDuplicateKey(error)) throw new ConflictError('Some of these rolls were just recorded');
+    throw error;
+  }
 }

@@ -343,9 +343,31 @@ export interface CustomerView {
   email: string;
   address: string;
   notes: string;
+  source: { id: string; name: string } | null;
+  sourceDetail: string;
   archived: boolean;
   /** Filled once sales exist (Part 8). */
   salesCount: number;
   totalPurchased: Money[];
   createdAt: string;
+}
+
+/** A priced lot not linked to any expense yet. */
+export interface UnrecordedLotView {
+  itemId: string;
+  lotId: string;
+  itemName: string;
+  kind: InventoryItemView['kind'];
+  lotLabel: string;
+  purchasedAt: string | null;
+  store: string;
+  totalCost: Money;
+}
+
+export interface CustomerSourceView {
+  id: string;
+  name: string;
+  archived: boolean;
+  /** Active customers who came from this source. */
+  customerCount: number;
 }

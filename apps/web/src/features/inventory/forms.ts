@@ -7,6 +7,7 @@ import type {
   PaymentMethod,
   Unit,
 } from '@printbi/shared';
+import { localToday } from '../../lib/period';
 
 export interface ItemForm {
   kind: ItemKind;
@@ -54,7 +55,7 @@ export interface LotForm {
   lowStockThreshold: string;
 }
 
-export const today = () => new Date().toISOString().slice(0, 10);
+export const today = localToday;
 
 export const emptyItem = (kind: ItemKind = 'filament'): ItemForm => ({
   kind,
@@ -90,7 +91,7 @@ export const emptyLot = (currency: Currency, expenseCategoryId = ''): LotForm =>
   purchasedAt: today(),
   store: '',
   notes: '',
-  recordExpense: false,
+  recordExpense: true,
   expenseCategoryId,
   paymentState: 'paid',
   paidAt: today(),

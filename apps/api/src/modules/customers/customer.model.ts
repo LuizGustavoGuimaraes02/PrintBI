@@ -10,6 +10,8 @@ const customerSchema = new Schema(
     email: { type: String, default: '', lowercase: true, trim: true },
     address: { type: String, default: '' },
     notes: { type: String, default: '' },
+    sourceId: { type: Schema.Types.ObjectId, default: null },
+    sourceDetail: { type: String, default: '' },
     archivedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
@@ -17,6 +19,7 @@ const customerSchema = new Schema(
 );
 
 customerSchema.index({ companyId: 1, archivedAt: 1, name: 1 });
+customerSchema.index({ companyId: 1, sourceId: 1 });
 customerSchema.plugin(tenantScope);
 
 export type Customer = InferSchemaType<typeof customerSchema>;
