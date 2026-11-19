@@ -142,14 +142,22 @@ describe('multi-color purchases', () => {
     expect(unpriced.status).toBe(400);
   });
 
-  it('employees without financial access record unpriced purchases only', async () => {
+  it('only members with financial access register filament, always with a price', async () => {
     const admin = await registerWithCompany(app);
     const employee = await addEmployee(app, admin.client, false);
     expect((await purchase(employee.client, { lines: [line('black', 'Black')] })).status).toBe(403);
     expect(
       (await purchase(employee.client, { lines: [line('black', 'Black', 1, { totalCost: null })] }))
         .status,
-    ).toBe(201);
+    ).toBe(403);
+
+    const unpriced = await purchase(admin.client, {
+      lines: [line('black', 'Black'), line('white', 'White', 1, { totalCost: null })],
+    });
+    expect(unpriced.status).toBe(400);
+    expect(unpriced.body.details).toEqual([
+      { path: 'lines.1.totalCost', message: 'Enter the price paid for the roll' },
+    ]);
   });
 });
 

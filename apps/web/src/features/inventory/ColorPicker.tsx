@@ -47,7 +47,7 @@ export function ColorPicker({ value, onChange, error }: ColorPickerProps) {
   );
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-3">
+    <fieldset className="@container flex min-w-0 flex-col gap-3">
       <legend className="label-mono mb-1 text-ink-muted">
         Color{' '}
         <span className="text-hot" aria-hidden="true">
@@ -89,7 +89,7 @@ export function ColorPicker({ value, onChange, error }: ColorPickerProps) {
       </div>
 
       {custom ? (
-        <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+        <div className="grid gap-4 @lg:grid-cols-[auto_1fr] @lg:items-end">
           <label className="flex flex-col gap-1.5">
             <span className="label-mono text-ink-muted">Swatch</span>
             <input
@@ -140,7 +140,7 @@ export function ColorPicker({ value, onChange, error }: ColorPickerProps) {
               ))}
             </div>
           </div>
-          <ul className="grid max-h-72 grid-cols-2 gap-1 overflow-y-auto rounded-[var(--radius-tile)] border border-rule-soft p-1.5 sm:grid-cols-3">
+          <ul className="grid max-h-72 grid-cols-2 gap-1 overflow-y-auto rounded-[var(--radius-tile)] border border-rule-soft p-1.5 @lg:grid-cols-3">
             {colors.length === 0 && (
               <li className="col-span-full p-3 text-sm text-ink-muted">
                 No color matches. Try a custom color.

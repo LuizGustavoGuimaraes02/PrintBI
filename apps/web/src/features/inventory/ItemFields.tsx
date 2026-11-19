@@ -39,7 +39,7 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="@container flex flex-col gap-6">
       {item.kind === 'filament' ? (
         <>
           <FilamentProductPicker
@@ -58,7 +58,7 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
               refreshName(before, { ...before, ...patch });
             }}
           />
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 @lg:grid-cols-2">
             <TextField
               label="Material"
               required
@@ -117,7 +117,7 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
             <summary className="cursor-pointer font-semibold">
               Diameter, density and temperatures
             </summary>
-            <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid gap-5 @lg:grid-cols-2 @3xl:grid-cols-3">
               <TextField
                 label="Diameter"
                 inputMode="decimal"
@@ -134,7 +134,7 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
                 error={errors?.densityGcm3?.message}
                 {...register('item.densityGcm3')}
               />
-              <span className="hidden lg:block" />
+              <span className="hidden @3xl:block" />
               <TextField
                 label="Nozzle min"
                 inputMode="numeric"
@@ -151,7 +151,7 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
                 error={errors?.nozzleTempMax?.message}
                 {...register('item.nozzleTempMax')}
               />
-              <span className="hidden lg:block" />
+              <span className="hidden @3xl:block" />
               <TextField
                 label="Bed min"
                 inputMode="numeric"
@@ -172,11 +172,11 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
           </details>
         </>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 @lg:grid-cols-2">
           <TextField
             label="Name"
             required
-            className="sm:col-span-2"
+            className="@lg:col-span-2"
             placeholder="e.g. M3 × 8 screw"
             error={errors?.name?.message}
             {...register('item.name')}
@@ -212,14 +212,14 @@ export function ItemFields({ form, products }: ItemFieldsProps) {
           <TextAreaField
             label="Description"
             rows={2}
-            className="sm:col-span-2"
+            className="@lg:col-span-2"
             error={errors?.description?.message}
             {...register('item.description')}
           />
         </div>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 @lg:grid-cols-2">
         {/* Filament warns per roll (see the roll fields); other items warn on their total. */}
         {item.kind !== 'filament' && (
           <TextField

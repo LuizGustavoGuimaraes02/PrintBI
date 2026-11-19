@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router';
 import {
   Button,
   cn,
+  EmptyState,
   Notice,
   PageHeader,
   PageLoader,
@@ -52,6 +53,7 @@ export function NewItemPage() {
   const { data: categories } = useCategories();
   const { data: products } = useFilamentProducts();
   const [kind, setKind] = useState<ItemKind>('filament');
+  const canSeeFinance = useCan('finance:view');
   if (!settings || !categories || !products) return <PageLoader />;
   const currency = settings.currency.defaultCurrency;
 
@@ -82,7 +84,12 @@ export function NewItemPage() {
           </button>
         ))}
       </div>
-      {kind === 'filament' ? (
+      {kind === 'filament' && !canSeeFinance ? (
+        <EmptyState title="Filament needs financial access">
+          Every roll is registered with the price paid, so only members with financial access can
+          add filament. You can still add other consumables and record filament usage.
+        </EmptyState>
+      ) : kind === 'filament' ? (
         <FilamentPurchase currency={currency} categories={categories} products={products} />
       ) : (
         <SingleItemForm

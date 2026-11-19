@@ -85,9 +85,15 @@ export function LotFields({
         <div className="grid gap-5 sm:grid-cols-[1fr_120px]">
           <TextField
             label="Price paid"
+            required={filament}
             inputMode="decimal"
             mono
-            hint={unitCost ?? 'Optional, but needed for costs and profit.'}
+            hint={
+              unitCost ??
+              (filament
+                ? 'The price paid for this roll.'
+                : 'Optional, but needed for costs and profit.')
+            }
             error={errors?.price?.message}
             {...register('lot.price')}
           />

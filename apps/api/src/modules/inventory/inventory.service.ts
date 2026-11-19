@@ -319,6 +319,25 @@ function assertMayRecordCosts(actor: Actor, lot: LotInput) {
 }
 
 /**
+ * Filament rolls always carry their price, so every gram used has a real cost. Registering
+ * filament is therefore limited to members with financial access.
+ */
+function assertFilamentPriced(
+  actor: Actor,
+  lot: { totalCost: LotInput['totalCost'] },
+  path = 'totalCost',
+) {
+  if (!actor.canSeeFinance) {
+    throw new ForbiddenError('Only members with financial access can register filament rolls');
+  }
+  if (!lot.totalCost) {
+    throw new ValidationError('Some fields are invalid', [
+      { path, message: 'Enter the price paid for the roll' },
+    ]);
+  }
+}
+
+/**
  * Adds a lot inside a transaction. The opening quantity enters through the ledger
  * (a purchase movement), so the ledger always explains every gram on the shelf.
  */
@@ -455,7 +474,11 @@ export async function createItem(
   input: { item: ItemInput; firstLot: LotInput | null },
   key: string,
 ): Promise<{ item: InventoryItemView; replayed: boolean }> {
-  if (input.firstLot) assertMayRecordCosts(actor, input.firstLot);
+  if (input.firstLot) {
+    assertMayRecordCosts(actor, input.firstLot);
+    if (input.item.kind === 'filament')
+      assertFilamentPriced(actor, input.firstLot, 'firstLot.totalCost');
+  }
   const fields = await definition(input.item);
 
   const create = async (session?: ClientSession) => {
@@ -544,7 +567,8 @@ export async function addLot(
   key: string,
 ): Promise<{ item: InventoryItemView; replayed: boolean }> {
   assertMayRecordCosts(actor, lot);
-  await loadItem(actor.companyId, itemId);
+  const existing = await loadItem(actor.companyId, itemId);
+  if (existing.kind === 'filament') assertFilamentPriced(actor, lot);
   const { replayed } = await runOnce(
     actor.companyId,
     key,
@@ -936,6 +960,20 @@ export async function recordPurchase(
   const definitions = await Promise.all(
     input.lines.map((line) => (line.item ? definition(line.item) : null)),
   );
+  // Lines that add to an existing item: look up its kind to apply the filament price rule.
+  const existingIds = input.lines.flatMap((l) => (l.itemId ? [new Types.ObjectId(l.itemId)] : []));
+  const existingKinds = new Map(
+    (
+      await InventoryItemModel.find(
+        { companyId: actor.companyId, _id: { $in: existingIds } },
+        { kind: 1 },
+      ).lean()
+    ).map((i) => [i._id.toString(), i.kind]),
+  );
+  input.lines.forEach((line, index) => {
+    const kind = line.item?.kind ?? (line.itemId ? existingKinds.get(line.itemId) : undefined);
+    if (kind === 'filament') assertFilamentPriced(actor, line, `lines.${index}.totalCost`);
+  });
 
   const { result, replayed } = await runOnce(
     actor.companyId,

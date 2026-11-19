@@ -1,9 +1,15 @@
 import { purchaseLineSchema, type InventoryItemView } from '@printbi/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithApp } from '../../test/render';
-import { existingMatch, FilamentPurchase, linePayload, type CartLine } from './FilamentPurchase';
+import {
+  applyBulk,
+  existingMatch,
+  FilamentPurchase,
+  linePayload,
+  type CartLine,
+} from './FilamentPurchase';
 import { emptyItem } from './forms';
 
 const blackLine: CartLine = {
@@ -34,10 +40,6 @@ describe('purchase lines', () => {
     expect(payload.item.name).toBe('Bambu Lab PLA Black');
   });
 
-  it('drop prices for members without financial access', () => {
-    expect(linePayload(blackLine, false).totalCost).toBeNull();
-  });
-
   it('recognise a filament already in stock by material, brand, color and diameter', () => {
     const stocked = {
       id: 'x',
@@ -54,54 +56,76 @@ describe('purchase lines', () => {
     expect(existingMatch([stocked], blackLine.item)?.id).toBe('x');
     expect(existingMatch([stocked], { ...blackLine.item, colorKey: 'white' })).toBeUndefined();
   });
+
+  it('bulk changes apply only the fields that were filled', () => {
+    const changed = applyBulk(blackLine, {
+      price: '18.5',
+      currency: 'BRL',
+      originalQuantity: '',
+      rolls: '',
+      lowStockThreshold: '150',
+    });
+    expect(changed).toMatchObject({
+      price: '18.5',
+      currency: 'BRL',
+      originalQuantity: '1000',
+      rolls: 2,
+      lowStockThreshold: '150',
+    });
+  });
 });
 
 describe('FilamentPurchase', () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  it('adds a roll, duplicates it with another color and saves both together', async () => {
-    const calls: { url: string; init: RequestInit }[] = [];
+  let calls: { url: string; init: RequestInit }[];
+  beforeEach(() => {
+    calls = [];
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init: RequestInit) => {
         calls.push({ url, init });
         if (url.startsWith('/api/v1/inventory/purchases'))
-          return new Response('[{"id":"a"},{"id":"b"}]', { status: 201 });
+          return new Response('[{"id":"a"}]', { status: 201 });
         if (url.startsWith('/api/v1/inventory/items')) return new Response('[]', { status: 200 });
-        if (url.includes('/settings'))
-          return new Response(
-            JSON.stringify({ inventory: { rollLowStockThreshold: 100_000_000 } }),
-            { status: 200 },
-          );
-        if (url.includes('/auth/me'))
-          return new Response(
-            JSON.stringify({ activeCompany: { permissions: ['finance:view', 'finance:manage'] } }),
-            { status: 200 },
-          );
         return new Response('{}', { status: 200 });
       }),
     );
-    renderWithApp(<FilamentPurchase currency="CAD" categories={[]} products={[]} />);
+  });
+  afterEach(() => vi.unstubAllGlobals());
 
+  async function addRoll(color: string, price = '20') {
+    await userEvent.clear(screen.getByLabelText(/^brand/i));
     await userEvent.type(screen.getByLabelText(/^brand/i), 'Bambu Lab');
-    await userEvent.type(screen.getByLabelText(/search colors/i), 'jet black');
-    await userEvent.click(screen.getByRole('button', { name: 'Jet Black' }));
+    const search = screen.getAllByLabelText(/search colors/i)[0] as HTMLElement;
+    await userEvent.clear(search);
+    await userEvent.type(search, color.toLowerCase());
+    await userEvent.click(screen.getByRole('button', { name: color }));
+    const priceField = screen.getByLabelText(/price per roll/i);
+    await userEvent.clear(priceField);
+    if (price) await userEvent.type(priceField, price);
     await userEvent.click(screen.getByRole('button', { name: /add to purchase/i }));
+  }
 
+  it('requires the price before a roll joins the purchase', async () => {
+    renderWithApp(<FilamentPurchase currency="CAD" categories={[]} products={[]} />);
+    await addRoll('Jet Black', '');
+    expect(await screen.findByText('Enter the price paid for each roll')).toBeInTheDocument();
+    expect(screen.getByText('Nothing added yet')).toBeInTheDocument();
+  });
+
+  it('duplicates a roll with another color, then saves everything together', async () => {
+    renderWithApp(<FilamentPurchase currency="CAD" categories={[]} products={[]} />);
+    await addRoll('Jet Black');
     expect(await screen.findByText('Bambu Lab PLA Jet Black')).toBeInTheDocument();
 
-    // Duplicate opens the color picker right away, on the list itself.
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Duplicate Bambu Lab PLA Jet Black' }),
+    );
     const dialog = await screen.findByRole('dialog', { name: 'Choose the color' });
     await userEvent.type(within(dialog).getByLabelText(/search colors/i), 'hot pink');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Hot Pink' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Use this color' }));
-    expect(await screen.findByText('Bambu Lab PLA Hot Pink')).toBeInTheDocument();
-    expect(screen.getByText('Bambu Lab PLA Jet Black')).toBeInTheDocument();
-
-    // Two rolls of hot pink.
-    const pinkRow = screen.getByText('Bambu Lab PLA Hot Pink').closest('li') as HTMLElement;
-    await userEvent.click(within(pinkRow).getByRole('button', { name: /one roll more/i }));
+    const pink = (await screen.findByText('Bambu Lab PLA Hot Pink')).closest('li') as HTMLElement;
+    await userEvent.click(within(pink).getByRole('button', { name: /one roll more/i }));
 
     await userEvent.click(screen.getByRole('button', { name: /save all \(3 rolls\)/i }));
     await waitFor(() =>
@@ -118,35 +142,30 @@ describe('FilamentPurchase', () => {
     expect((post?.init.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy();
   });
 
-  it('changes the color of a line from the list, keeping its rolls', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) =>
-        url.startsWith('/api/v1/inventory/items')
-          ? new Response('[]', { status: 200 })
-          : new Response('{}', { status: 200 }),
-      ),
-    );
+  it('selects all rolls and changes their price at once', async () => {
     renderWithApp(<FilamentPurchase currency="CAD" categories={[]} products={[]} />);
-    await userEvent.type(screen.getByLabelText(/^brand/i), 'Bambu Lab');
-    await userEvent.type(screen.getByLabelText(/search colors/i), 'jet black');
-    await userEvent.click(screen.getByRole('button', { name: 'Jet Black' }));
-    await userEvent.clear(screen.getByLabelText(/rolls of this color/i));
-    await userEvent.type(screen.getByLabelText(/rolls of this color/i), '3');
-    await userEvent.click(screen.getByRole('button', { name: /add to purchase/i }));
+    await addRoll('Jet Black');
+    await addRoll('Cold White');
+    await addRoll('Hot Pink');
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: /change the color of bambu lab pla jet black/i }),
-    );
-    const dialog = await screen.findByRole('dialog', { name: 'Choose the color' });
-    await userEvent.type(within(dialog).getByLabelText(/search colors/i), 'silk gold silver');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Silk Gold & Silver' }));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Use this color' }));
+    await userEvent.click(screen.getByLabelText('Select all'));
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    const bar = screen.getByRole('region', { name: 'Change 3 selected rolls' });
+    await userEvent.type(within(bar).getByLabelText(/price per roll/i), '18');
+    await userEvent.click(within(bar).getByRole('button', { name: 'Apply to selected' }));
 
-    const row = (await screen.findByText('Bambu Lab PLA Silk Gold & Silver')).closest(
-      'li',
-    ) as HTMLElement;
-    expect(within(row).getByText('3×')).toBeInTheDocument();
-    expect(screen.queryByText('Bambu Lab PLA Jet Black')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/CAD 18$/)).toHaveLength(3);
+    expect(screen.getByText(/CAD 54\.00/)).toBeInTheDocument();
+  });
+
+  it('selects rolls one by one to remove them', async () => {
+    renderWithApp(<FilamentPurchase currency="CAD" categories={[]} products={[]} />);
+    await addRoll('Jet Black');
+    await addRoll('Cold White');
+    await userEvent.click(screen.getByLabelText('Select Bambu Lab PLA Cold White'));
+    const bar = screen.getByRole('region', { name: 'Change 1 selected rolls' });
+    await userEvent.click(within(bar).getByRole('button', { name: /remove selected/i }));
+    expect(screen.queryByText('Bambu Lab PLA Cold White')).not.toBeInTheDocument();
+    expect(screen.getByText('Bambu Lab PLA Jet Black')).toBeInTheDocument();
   });
 });

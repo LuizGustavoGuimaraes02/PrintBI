@@ -29,7 +29,8 @@ async function createSpool(
 ) {
   const res = await client.post(
     '/api/v1/inventory/items',
-    { item: plaBlack, firstLot: lot },
+    // Filament rolls always need a price; tests that only care about grams get a default one.
+    { item: plaBlack, firstLot: { totalCost: CAD('25'), ...lot } },
     { 'Idempotency-Key': newKey() },
   );
   expect(res.status).toBe(201);
@@ -98,7 +99,10 @@ describe('adding stock', () => {
   it('a repeated request with the same key creates nothing new', async () => {
     const { client, companyId } = await registerWithCompany(app);
     const key = newKey();
-    const body = { item: plaBlack, firstLot: { originalQuantity: '1000', remaining: '1000' } };
+    const body = {
+      item: plaBlack,
+      firstLot: { originalQuantity: '1000', remaining: '1000', totalCost: CAD('25') },
+    };
     const first = await client.post('/api/v1/inventory/items', body, { 'Idempotency-Key': key });
     const again = await client.post('/api/v1/inventory/items', body, { 'Idempotency-Key': key });
     expect(first.status).toBe(201);
@@ -112,7 +116,7 @@ describe('adding stock', () => {
     const { client } = await registerWithCompany(app);
     const res = await client.post('/api/v1/inventory/items', {
       item: plaBlack,
-      firstLot: { originalQuantity: '10', remaining: '10' },
+      firstLot: { originalQuantity: '10', remaining: '10', totalCost: CAD('1') },
     });
     expect(res.status).toBe(400);
   });
@@ -132,6 +136,45 @@ describe('adding stock', () => {
       label: 'Lot 1',
       unitCost: { amount: 100_000, currency: 'CAD' },
     }); // 0.10 each
+  });
+});
+
+describe('filament price rule', () => {
+  it('refuses a filament roll without its price', async () => {
+    const { client } = await registerWithCompany(app);
+    const res = await client.post(
+      '/api/v1/inventory/items',
+      { item: plaBlack, firstLot: { originalQuantity: '1000', remaining: '1000' } },
+      { 'Idempotency-Key': newKey() },
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.details).toEqual([
+      { path: 'firstLot.totalCost', message: 'Enter the price paid for the roll' },
+    ]);
+  });
+
+  it('refuses adding a roll without its price', async () => {
+    const { client } = await registerWithCompany(app);
+    const item = await createSpool(client);
+    const res = await client.post(
+      `/api/v1/inventory/items/${item.id}/lots`,
+      { originalQuantity: '1000', remaining: '1000' },
+      { 'Idempotency-Key': newKey() },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('still allows consumables without a price', async () => {
+    const { client } = await registerWithCompany(app);
+    const res = await client.post(
+      '/api/v1/inventory/items',
+      {
+        item: { kind: 'packaging', name: 'Small box', category: 'Packaging', unit: 'unit' },
+        firstLot: { originalQuantity: '20', remaining: '20' },
+      },
+      { 'Idempotency-Key': newKey() },
+    );
+    expect(res.status).toBe(201);
   });
 });
 
