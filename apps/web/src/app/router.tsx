@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet, type RouteObject } from 'react-router';
 import { GuestOnly, RequireAccount, RequireCompany, SessionWatcher } from '../features/auth/guards';
 import { ModulePlaceholder } from '../features/modules/ModulePlaceholder';
 import { AppShell } from '../layout/AppShell';
@@ -29,6 +29,7 @@ export const routes: RouteObject[] = [
   // Public showcase: no account, no session handling.
   { path: '/s/:companySlug', ...page(showcase, 'PublicShowcasePage') },
   { path: '/s/:companySlug/:productSlug', ...page(showcase, 'PublicProductPage') },
+  { path: '/s/:companySlug/c/:collectionSlug', ...page(showcase, 'PublicCollectionPage') },
   {
     element: <SessionWatcher />,
     children: [
@@ -46,6 +47,16 @@ export const routes: RouteObject[] = [
         element: <RequireAccount />,
         children: [
           { path: '/onboarding', ...page(auth, 'CreateCompanyPage') },
+          // The admin's preview of a seasonal page, full screen like the public one.
+          {
+            path: '/showcase/collections/:key/preview',
+            element: (
+              <RequireCompany>
+                <Outlet />
+              </RequireCompany>
+            ),
+            children: [{ index: true, ...page(showcase, 'CollectionPreviewPage') }],
+          },
           {
             element: (
               <RequireCompany>

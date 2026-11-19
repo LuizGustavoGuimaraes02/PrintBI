@@ -49,6 +49,7 @@ export interface ProductRecord {
     featured?: boolean | null;
     order?: number | null;
     slug?: string | null;
+    collections?: ProductView['showcase']['collections'] | null;
   } | null;
   archivedAt?: Date | null;
   updatedAt: Date;
@@ -93,6 +94,7 @@ export async function toViews(
       featured: p.showcase?.featured ?? false,
       order: p.showcase?.order ?? 0,
       slug: p.showcase?.slug ?? null,
+      collections: p.showcase?.collections ?? [],
     },
     archived: Boolean(p.archivedAt),
     soldQuantity: 0,
@@ -367,6 +369,7 @@ export async function setProductShowcase(
     'showcase.badge': input.badge,
     'showcase.showPrice': input.showPrice,
     'showcase.featured': input.featured,
+    'showcase.collections': input.collections,
   };
   if (input.visible && !product.showcase?.slug) {
     set['showcase.slug'] = await uniqueProductSlug(companyId, product.name);

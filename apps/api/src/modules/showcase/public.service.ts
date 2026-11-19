@@ -1,5 +1,8 @@
 import type {
+  CollectionKey,
   Money,
+  PublicCollectionPageView,
+  PublicCollectionView,
   PublicBusinessView,
   PublicImageView,
   PublicLabelView,
@@ -13,6 +16,7 @@ import { imageView } from '../../core/media/cloudinary';
 import { CompanyModel } from '../companies/company.model';
 import { ProductModel } from '../products/product.model';
 import type { ImageRecord, ProductRecord } from '../products/products.service';
+import { resolveAll, type ResolvedCollection, type StoredCollection } from './collections.service';
 
 /**
  * The public showcase. Everything here is read by visitors without an account, so each view
@@ -30,6 +34,7 @@ interface CompanyRecord {
   _id: Types.ObjectId;
   name: string;
   slug: string;
+  collections?: StoredCollection[];
   website?: string | null;
   social?: string | null;
   logo?: ImageRecord | null;
@@ -43,10 +48,21 @@ interface CompanyRecord {
   } | null;
 }
 
+const COMPANY_FIELDS = {
+  name: 1,
+  slug: 1,
+  website: 1,
+  social: 1,
+  logo: 1,
+  labels: 1,
+  showcase: 1,
+  collections: 1,
+} as const;
+
 async function publishedCompany(slug: string): Promise<CompanyRecord> {
   const company = await CompanyModel.findOne(
     { slug, 'showcase.published': true },
-    { name: 1, slug: 1, website: 1, social: 1, logo: 1, labels: 1, showcase: 1 },
+    COMPANY_FIELDS,
   ).lean();
   if (!company) throw NOT_FOUND();
   return company as unknown as CompanyRecord;
@@ -146,6 +162,9 @@ export async function getPublicShowcase(slug: string): Promise<PublicShowcaseVie
     business: businessView(company),
     labels: [...used.values()].sort((a, b) => a.name.localeCompare(b.name)),
     products,
+    collections: resolveAll(company.collections)
+      .filter((c) => c.active)
+      .map(collectionView),
   };
 }
 
@@ -164,4 +183,79 @@ export async function getPublicProduct(
     images: (product.images ?? []).map(publicImage),
     business: businessView(company),
   };
+}
+
+// ---- Seasonal collections ------------------------------------------------------------------
+
+function collectionView(c: ResolvedCollection): PublicCollectionView {
+  const image = (i: ImageRecord | null) => (i ? publicImage(i) : null);
+  return {
+    key: c.key,
+    slug: c.slug,
+    name: c.name,
+    title: c.title,
+    intro: c.intro,
+    banners: {
+      pt: {
+        desktop: image(c.banners.pt.desktop),
+        mobile: image(c.banners.pt.mobile),
+        alt: c.alt.pt,
+      },
+      en: {
+        desktop: image(c.banners.en.desktop),
+        mobile: image(c.banners.en.mobile),
+        alt: c.alt.en,
+      },
+    },
+    header: image(c.header),
+  };
+}
+
+async function collectionPage(
+  company: CompanyRecord,
+  collection: ResolvedCollection,
+  preview: boolean,
+): Promise<PublicCollectionPageView> {
+  const rows = (await ProductModel.find(
+    { ...visible(company._id), 'showcase.collections': collection.key },
+    PUBLIC_PRODUCT_FIELDS,
+  )
+    .sort({ 'showcase.order': 1, name: 1 })
+    .limit(500)
+    .lean()) as unknown as ProductRecord[];
+  const labelsFor = labelLookup(company);
+  return {
+    business: businessView(company),
+    collection: collectionView(collection),
+    products: rows.filter((p) => p.showcase?.slug).map((p) => cardView(p, labelsFor)),
+    preview,
+  };
+}
+
+/** A seasonal page. A collection that is turned off answers "not found", as if it didn't exist. */
+export async function getPublicCollection(
+  slug: string,
+  collectionSlug: string,
+): Promise<PublicCollectionPageView> {
+  const company = await publishedCompany(slug);
+  const collection = resolveAll(company.collections).find(
+    (c) => c.slug === collectionSlug && c.active,
+  );
+  if (!collection) throw new NotFoundError('Collection');
+  return collectionPage(company, collection, false);
+}
+
+/** The admin's preview: the full themed page, even while hidden or before publishing. */
+export async function getCollectionPreview(
+  companyId: Types.ObjectId,
+  key: CollectionKey,
+): Promise<PublicCollectionPageView> {
+  const company = (await CompanyModel.findById(
+    companyId,
+    COMPANY_FIELDS,
+  ).lean()) as unknown as CompanyRecord | null;
+  if (!company) throw new NotFoundError('Company');
+  const collection = resolveAll(company.collections).find((c) => c.key === key);
+  if (!collection) throw new NotFoundError('Collection');
+  return collectionPage({ ...company, slug: company.slug ?? '' }, collection, true);
 }

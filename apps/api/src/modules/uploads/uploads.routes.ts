@@ -5,7 +5,7 @@ import { authenticate, getCompanyAuth, requireCompany } from '../../core/auth/au
 import { ForbiddenError, NotFoundError } from '../../core/errors';
 import { parseInput } from '../../core/http/validate';
 import { uploadsEnabled } from '../../core/media/cloudinary';
-import { logoRule, productImageRule, signFor } from '../../core/media/uploads';
+import { collectionImageRule, logoRule, productImageRule, signFor } from '../../core/media/uploads';
 import { ProductModel } from '../products/product.model';
 
 /**
@@ -24,6 +24,11 @@ uploadsRouter.get('/config', (_req, res) => {
 uploadsRouter.post('/sign', async (req, res) => {
   const auth = getCompanyAuth(req);
   const input = parseInput(signUploadSchema, req.body);
+  if (input.target === 'collection') {
+    if (!auth.permissions.includes('showcase:manage')) throw new ForbiddenError();
+    res.json(signFor(collectionImageRule(auth.companyId, input.key)));
+    return;
+  }
   if (input.target === 'logo') {
     if (!auth.permissions.includes('settings:manage')) throw new ForbiddenError();
     res.json(signFor(logoRule(auth.companyId)));

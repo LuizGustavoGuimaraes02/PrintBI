@@ -1,5 +1,8 @@
 import {
+  COLLECTION_IMAGE_FORMATS,
+  COLLECTION_IMAGE_MAX_BYTES,
   LOGO_FORMATS,
+  type CollectionKey,
   LOGO_MAX_BYTES,
   PRODUCT_IMAGE_FORMATS,
   PRODUCT_IMAGE_MAX_BYTES,
@@ -49,6 +52,13 @@ export const logoRule = (companyId: Types.ObjectId): UploadRule => ({
   folder: `printbi/${folderKey(companyId)}/logo`,
   formats: LOGO_FORMATS,
   maxBytes: LOGO_MAX_BYTES,
+});
+
+/** Banners and page headers of a seasonal collection. */
+export const collectionImageRule = (companyId: Types.ObjectId, key: CollectionKey): UploadRule => ({
+  folder: `printbi/${folderKey(companyId)}/collections/${key}`,
+  formats: COLLECTION_IMAGE_FORMATS,
+  maxBytes: COLLECTION_IMAGE_MAX_BYTES,
 });
 
 export function signFor(rule: UploadRule): UploadSignatureView {

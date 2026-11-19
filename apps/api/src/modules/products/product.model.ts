@@ -1,4 +1,4 @@
-import { PRODUCT_TYPES, SALE_UNITS, SHOWCASE_BADGES } from '@printbi/shared';
+import { COLLECTION_KEYS, PRODUCT_TYPES, SALE_UNITS, SHOWCASE_BADGES } from '@printbi/shared';
 import { model, Schema, type InferSchemaType } from 'mongoose';
 import { imageSchema } from '../../core/db-schemas/image.schema';
 import { microField, moneySchema } from '../../core/db-schemas/money.schema';
@@ -31,6 +31,7 @@ const productSchema = new Schema(
       featured: { type: Boolean, default: false },
       order: { type: Number, default: 0 },
       slug: { type: String, default: null },
+      collections: { type: [{ type: String, enum: COLLECTION_KEYS }], default: [] },
     },
     archivedAt: { type: Date, default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -41,6 +42,7 @@ const productSchema = new Schema(
 productSchema.index({ companyId: 1, archivedAt: 1, name: 1 });
 productSchema.index({ companyId: 1, labelIds: 1 });
 productSchema.index({ companyId: 1, 'showcase.visible': 1, 'showcase.order': 1 });
+productSchema.index({ companyId: 1, 'showcase.collections': 1 });
 productSchema.index(
   { companyId: 1, 'showcase.slug': 1 },
   { unique: true, partialFilterExpression: { 'showcase.slug': { $type: 'string' } } },

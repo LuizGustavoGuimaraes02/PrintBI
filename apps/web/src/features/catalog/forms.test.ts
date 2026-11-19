@@ -32,6 +32,7 @@ const view: ProductView = {
     featured: false,
     order: 0,
     slug: null,
+    collections: [],
   },
   archived: false,
   soldQuantity: 0,

@@ -373,7 +373,7 @@ describe('public showcase', () => {
     expect(res.headers['cache-control']).toContain('public');
     expect(res.headers.etag).toBeDefined();
 
-    expect(Object.keys(res.body).sort()).toEqual(['business', 'labels', 'products']);
+    expect(Object.keys(res.body).sort()).toEqual(['business', 'collections', 'labels', 'products']);
     expect(Object.keys(res.body.business).sort()).toEqual(
       [
         'description',

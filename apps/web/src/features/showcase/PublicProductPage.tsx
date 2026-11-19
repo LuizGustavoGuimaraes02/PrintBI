@@ -8,12 +8,14 @@ import { filamentLine, priceLine, sizeLine } from './format';
 import { PublicLayout, PublicLoading, PublicNotFound, usePageMeta } from './PublicLayout';
 import { NoPhoto } from './PublicShowcasePage';
 import { usePublicProduct } from './queries';
+import { useShowcaseLanguage } from './language';
 import { stringsFor, type ShowcaseStrings } from './strings';
 
 export function PublicProductPage() {
   const { companySlug = '', productSlug = '' } = useParams();
   const { data: product, error, isPending } = usePublicProduct(companySlug, productSlug);
-  const t = stringsFor(product?.business.language ?? 'pt-BR');
+  const [language, setLanguage] = useShowcaseLanguage(product?.business.language);
+  const t = stringsFor(language);
   usePageMeta(product ? `${product.name} · ${product.business.name}` : null, t.locale);
 
   if (isPending) return <PublicLoading />;
@@ -36,12 +38,12 @@ export function PublicProductPage() {
   const whatsapp = whatsappProductLink(
     business.whatsapp,
     business.messageTemplate,
-    business.language,
+    language,
     product.name,
   );
 
   return (
-    <PublicLayout business={business} t={t}>
+    <PublicLayout business={business} t={t} language={language} onLanguage={setLanguage}>
       <Link
         to={`/s/${business.slug}`}
         className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-ink-muted hover:text-ink"

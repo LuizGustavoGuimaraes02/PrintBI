@@ -1,9 +1,10 @@
-import type { PublicBusinessView, PublicImageView } from '@printbi/shared';
+import type { PublicBusinessView, PublicImageView, ShowcaseLanguage } from '@printbi/shared';
 import { ExternalLink } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { EmptyState, NozzleLoader, SpoolMark } from '../../design-system';
 import { safeUrl } from './format';
+import { LanguageSwitch } from './language';
 import { browserLanguage, stringsFor, type ShowcaseStrings } from './strings';
 
 /** Sets the tab title and the page language for screen readers and translators. */
@@ -57,22 +58,25 @@ function Logo({ logo, name, size }: { logo: PublicImageView; name: string; size:
 interface PublicLayoutProps {
   business: PublicBusinessView;
   t: ShowcaseStrings;
+  language: ShowcaseLanguage;
+  onLanguage: (language: ShowcaseLanguage) => void;
   children: ReactNode;
 }
 
-export function PublicLayout({ business, t, children }: PublicLayoutProps) {
+export function PublicLayout({ business, t, language, onLanguage, children }: PublicLayoutProps) {
   const website = safeUrl(business.website);
   const social = safeUrl(business.social);
   return (
     <div className="flex min-h-dvh flex-col bg-mist">
       <header className="border-b border-rule-soft bg-surface">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Link to={`/s/${business.slug}`} className="flex min-w-0 items-center gap-3">
+          <Link to={`/s/${business.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
             <BusinessMark business={business} size={40} />
             <span className="truncate text-lg font-extrabold tracking-[-0.02em]">
               {business.name}
             </span>
           </Link>
+          <LanguageSwitch language={language} onChange={onLanguage} />
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">

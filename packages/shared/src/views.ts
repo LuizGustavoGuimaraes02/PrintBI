@@ -403,6 +403,8 @@ export interface ProductShowcaseView {
   order: number;
   /** Part of the public product link; set the first time the product is shown. */
   slug: string | null;
+  /** Seasonal collections it also appears in. */
+  collections: ('valentines' | 'easter' | 'halloween' | 'christmas')[];
 }
 
 export interface UploadConfigView {
@@ -458,6 +460,8 @@ export interface PublicShowcaseView {
   business: PublicBusinessView;
   labels: PublicLabelView[];
   products: PublicProductCardView[];
+  /** Active seasonal collections, shown as the banner (a carousel when there are several). */
+  collections: PublicCollectionView[];
 }
 
 export interface PublicProductCardView {
@@ -495,4 +499,50 @@ export interface StockDeletePreviewView {
     shared: boolean;
   }[];
   linkedExpenseCount: number;
+}
+
+type CollectionKeyView = 'valentines' | 'easter' | 'halloween' | 'christmas';
+interface LocalizedTextView {
+  pt: string;
+  en: string;
+}
+
+/** One language's banner: the desktop image, the mobile one and their description. */
+export interface CollectionBannerView<TImage = ImageView> {
+  desktop: TImage | null;
+  mobile: TImage | null;
+  alt: string;
+}
+
+/** A seasonal collection as the admin edits it. Texts already fall back to the defaults. */
+export interface CollectionView {
+  key: CollectionKeyView;
+  slug: string;
+  active: boolean;
+  name: LocalizedTextView;
+  title: LocalizedTextView;
+  intro: LocalizedTextView;
+  banners: { pt: CollectionBannerView; en: CollectionBannerView };
+  header: ImageView | null;
+  /** Visible products that belong to it. */
+  productCount: number;
+}
+
+/** A collection on the public pages: both languages, so the visitor can switch without a reload. */
+export interface PublicCollectionView {
+  key: CollectionKeyView;
+  slug: string;
+  name: LocalizedTextView;
+  title: LocalizedTextView;
+  intro: LocalizedTextView;
+  banners: { pt: CollectionBannerView<PublicImageView>; en: CollectionBannerView<PublicImageView> };
+  header: PublicImageView | null;
+}
+
+export interface PublicCollectionPageView {
+  business: PublicBusinessView;
+  collection: PublicCollectionView;
+  products: PublicProductCardView[];
+  /** True on the admin's preview of a collection that is still hidden. */
+  preview: boolean;
 }

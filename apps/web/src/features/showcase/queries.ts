@@ -1,4 +1,8 @@
-import type { PublicProductView, PublicShowcaseView } from '@printbi/shared';
+import type {
+  PublicCollectionPageView,
+  PublicProductView,
+  PublicShowcaseView,
+} from '@printbi/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '../../lib/api';
 
@@ -22,6 +26,18 @@ export const usePublicProduct = (slug: string, productSlug: string) =>
     queryFn: () =>
       api.get<PublicProductView>(
         `/public/showcase/${encodeURIComponent(slug)}/${encodeURIComponent(productSlug)}`,
+        options,
+      ),
+    retry,
+    staleTime: 60_000,
+  });
+
+export const usePublicCollection = (slug: string, collectionSlug: string) =>
+  useQuery({
+    queryKey: ['public', 'showcase', slug, 'c', collectionSlug],
+    queryFn: () =>
+      api.get<PublicCollectionPageView>(
+        `/public/showcase/${encodeURIComponent(slug)}/c/${encodeURIComponent(collectionSlug)}`,
         options,
       ),
     retry,

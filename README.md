@@ -134,70 +134,75 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 
 ### API endpoints (`/api/v1`)
 
-| Method            | Path                                               | Access                               |
-| ----------------- | -------------------------------------------------- | ------------------------------------ |
-| POST              | `/auth/register`, `/auth/login`                    | Public, rate limited                 |
-| POST              | `/auth/refresh`, `/auth/logout`                    | Refresh cookie                       |
-| POST              | `/auth/password/forgot`, `/auth/password/reset`    | Public, rate limited                 |
-| GET               | `/auth/me`                                         | Signed in                            |
-| POST              | `/auth/logout-all`, `/auth/switch-company`         | Signed in                            |
-| PUT               | `/auth/password`                                   | Signed in                            |
-| POST              | `/companies`                                       | Signed in                            |
-| GET               | `/companies/current`, `/companies/current/members` | Member                               |
-| PATCH             | `/companies/current`                               | `settings:manage`                    |
-| PATCH, DELETE     | `/companies/current/members/:userId`               | `members:manage`                     |
-| GET, POST         | `/companies/current/invites`                       | `members:manage`                     |
-| DELETE            | `/companies/current/invites/:inviteId`             | `members:manage`                     |
-| GET               | `/companies/current/settings`                      | Member                               |
-| PATCH             | `/companies/current/settings`                      | `settings:manage`                    |
-| GET               | `/companies/current/printers`                      | Member (costs need `finance:view`)   |
-| POST, PUT, DELETE | `/companies/current/printers[/:printerId]`         | `settings:manage`                    |
-| GET               | `/companies/current/expense-categories`            | Member                               |
-| POST, PATCH       | `/companies/current/expense-categories[/:id]`      | `settings:manage`                    |
-| GET               | `/invites/:token`                                  | Public preview, rate limited         |
-| POST              | `/invites/accept`                                  | Signed in as the invited email       |
-| GET               | `/printer-models`                                  | Signed in (cached for an hour)       |
-| GET               | `/filament-products`                               | Signed in (cached for an hour)       |
-| GET               | `/inventory/summary`, `/inventory/items[/:id]`     | Member (costs need `finance:view`)   |
-| GET               | `/inventory/items/:id/movements`                   | Member                               |
-| POST, PUT         | `/inventory/items[/:id]`                           | Member; key when stock moves         |
-| POST              | `/inventory/items/:id/lots`                        | Member · Idempotency-Key             |
-| PATCH             | `/inventory/items/:id/lots/:lotId`                 | Member (price needs finance)         |
-| POST              | `/inventory/items/:id/lots/:lotId/adjust`          | Member · Idempotency-Key             |
-| POST              | `/inventory/purchases`                             | Member · Idempotency-Key             |
-| GET               | `/inventory/unrecorded-lots`                       | `finance:manage`                     |
-| POST              | `/inventory/unrecorded-lots/expenses`              | `finance:manage`                     |
-| POST              | `/inventory/consumptions`                          | Member · Idempotency-Key             |
-| POST              | `/inventory/movements/:id/reverse`                 | Member · Idempotency-Key             |
-| POST              | `/inventory/items/:id/archive`                     | `records:archive`                    |
-| GET               | `/inventory/items/:id/delete-preview`              | `records:archive`                    |
-| DELETE            | `/inventory/items/:id[/lots/:lotId]`               | `records:archive`                    |
-| GET               | `/expenses`, `/expenses/summary`, `/expenses/:id`  | `finance:view`                       |
-| POST, PATCH       | `/expenses[/:id]`                                  | `finance:manage`                     |
-| POST, DELETE      | `/expenses/:id/payments[/:paymentId]`              | `finance:manage` (POST: key)         |
-| POST              | `/expenses/:id/cancel`                             | `finance:manage` + `records:archive` |
-| DELETE            | `/expenses/:id`                                    | `finance:manage` + `records:archive` |
-| GET, POST         | `/labels`                                          | Member                               |
-| PATCH             | `/labels/:id`                                      | Member                               |
-| GET, POST, PUT    | `/products[/:id]`                                  | Member (cost needs `finance:view`)   |
-| POST              | `/products/:id/archive`                            | `records:archive`                    |
-| DELETE            | `/products/:id`                                    | `records:archive`                    |
-| POST, PUT         | `/products/:id/images`                             | Member (register, reorder, alt text) |
-| DELETE            | `/products/:id/images/:imageId`                    | Member                               |
-| PUT               | `/products/:id/showcase`                           | `showcase:manage`                    |
-| GET               | `/uploads/config`                                  | Member                               |
-| POST              | `/uploads/sign`                                    | Member (logo: `settings:manage`)     |
-| POST, DELETE      | `/companies/current/logo`                          | `settings:manage`                    |
-| GET               | `/companies/current/showcase[/products]`           | Member                               |
-| PUT               | `/companies/current/showcase[/order]`              | `showcase:manage`                    |
-| GET               | `/public/showcase/:slug[/:productSlug]`            | Public, own rate limit, cached 60 s  |
-| GET, POST         | `/customer-sources`                                | Member                               |
-| PATCH             | `/customer-sources/:id`                            | Member                               |
-| GET, POST, PUT    | `/customers[/:id]`                                 | Member                               |
-| POST              | `/customers/:id/archive`                           | `records:archive`                    |
-| DELETE            | `/customers/:id`                                   | `records:archive`                    |
-| DELETE            | `/labels/:id`, `/customer-sources/:id`             | Member                               |
-| DELETE            | `/companies/current/expense-categories/:id`        | `settings:manage`                    |
+| Method            | Path                                                   | Access                                  |
+| ----------------- | ------------------------------------------------------ | --------------------------------------- |
+| POST              | `/auth/register`, `/auth/login`                        | Public, rate limited                    |
+| POST              | `/auth/refresh`, `/auth/logout`                        | Refresh cookie                          |
+| POST              | `/auth/password/forgot`, `/auth/password/reset`        | Public, rate limited                    |
+| GET               | `/auth/me`                                             | Signed in                               |
+| POST              | `/auth/logout-all`, `/auth/switch-company`             | Signed in                               |
+| PUT               | `/auth/password`                                       | Signed in                               |
+| POST              | `/companies`                                           | Signed in                               |
+| GET               | `/companies/current`, `/companies/current/members`     | Member                                  |
+| PATCH             | `/companies/current`                                   | `settings:manage`                       |
+| PATCH, DELETE     | `/companies/current/members/:userId`                   | `members:manage`                        |
+| GET, POST         | `/companies/current/invites`                           | `members:manage`                        |
+| DELETE            | `/companies/current/invites/:inviteId`                 | `members:manage`                        |
+| GET               | `/companies/current/settings`                          | Member                                  |
+| PATCH             | `/companies/current/settings`                          | `settings:manage`                       |
+| GET               | `/companies/current/printers`                          | Member (costs need `finance:view`)      |
+| POST, PUT, DELETE | `/companies/current/printers[/:printerId]`             | `settings:manage`                       |
+| GET               | `/companies/current/expense-categories`                | Member                                  |
+| POST, PATCH       | `/companies/current/expense-categories[/:id]`          | `settings:manage`                       |
+| GET               | `/invites/:token`                                      | Public preview, rate limited            |
+| POST              | `/invites/accept`                                      | Signed in as the invited email          |
+| GET               | `/printer-models`                                      | Signed in (cached for an hour)          |
+| GET               | `/filament-products`                                   | Signed in (cached for an hour)          |
+| GET               | `/inventory/summary`, `/inventory/items[/:id]`         | Member (costs need `finance:view`)      |
+| GET               | `/inventory/items/:id/movements`                       | Member                                  |
+| POST, PUT         | `/inventory/items[/:id]`                               | Member; key when stock moves            |
+| POST              | `/inventory/items/:id/lots`                            | Member · Idempotency-Key                |
+| PATCH             | `/inventory/items/:id/lots/:lotId`                     | Member (price needs finance)            |
+| POST              | `/inventory/items/:id/lots/:lotId/adjust`              | Member · Idempotency-Key                |
+| POST              | `/inventory/purchases`                                 | Member · Idempotency-Key                |
+| GET               | `/inventory/unrecorded-lots`                           | `finance:manage`                        |
+| POST              | `/inventory/unrecorded-lots/expenses`                  | `finance:manage`                        |
+| POST              | `/inventory/consumptions`                              | Member · Idempotency-Key                |
+| POST              | `/inventory/movements/:id/reverse`                     | Member · Idempotency-Key                |
+| POST              | `/inventory/items/:id/archive`                         | `records:archive`                       |
+| GET               | `/inventory/items/:id/delete-preview`                  | `records:archive`                       |
+| DELETE            | `/inventory/items/:id[/lots/:lotId]`                   | `records:archive`                       |
+| GET               | `/expenses`, `/expenses/summary`, `/expenses/:id`      | `finance:view`                          |
+| POST, PATCH       | `/expenses[/:id]`                                      | `finance:manage`                        |
+| POST, DELETE      | `/expenses/:id/payments[/:paymentId]`                  | `finance:manage` (POST: key)            |
+| POST              | `/expenses/:id/cancel`                                 | `finance:manage` + `records:archive`    |
+| DELETE            | `/expenses/:id`                                        | `finance:manage` + `records:archive`    |
+| GET, POST         | `/labels`                                              | Member                                  |
+| PATCH             | `/labels/:id`                                          | Member                                  |
+| GET, POST, PUT    | `/products[/:id]`                                      | Member (cost needs `finance:view`)      |
+| POST              | `/products/:id/archive`                                | `records:archive`                       |
+| DELETE            | `/products/:id`                                        | `records:archive`                       |
+| POST, PUT         | `/products/:id/images`                                 | Member (register, reorder, alt text)    |
+| DELETE            | `/products/:id/images/:imageId`                        | Member                                  |
+| PUT               | `/products/:id/showcase`                               | `showcase:manage`                       |
+| GET               | `/uploads/config`                                      | Member                                  |
+| POST              | `/uploads/sign`                                        | Member (logo: `settings:manage`)        |
+| POST, DELETE      | `/companies/current/logo`                              | `settings:manage`                       |
+| GET               | `/companies/current/showcase[/products]`               | Member                                  |
+| PUT               | `/companies/current/showcase[/order]`                  | `showcase:manage`                       |
+| GET               | `/public/showcase/:slug[/:productSlug]`                | Public, own rate limit, cached 60 s     |
+| GET               | `/public/showcase/:slug/c/:collectionSlug`             | Public; 404 while the collection is off |
+| GET               | `/companies/current/showcase/collections`              | Member                                  |
+| PUT               | `/companies/current/showcase/collections/:key`         | `showcase:manage`                       |
+| POST, DELETE      | `/companies/current/showcase/collections/:key/images`  | `showcase:manage`                       |
+| GET               | `/companies/current/showcase/collections/:key/preview` | `showcase:manage`                       |
+| GET, POST         | `/customer-sources`                                    | Member                                  |
+| PATCH             | `/customer-sources/:id`                                | Member                                  |
+| GET, POST, PUT    | `/customers[/:id]`                                     | Member                                  |
+| POST              | `/customers/:id/archive`                               | `records:archive`                       |
+| DELETE            | `/customers/:id`                                       | `records:archive`                       |
+| DELETE            | `/labels/:id`, `/customer-sources/:id`                 | Member                                  |
+| DELETE            | `/companies/current/expense-categories/:id`            | `settings:manage`                       |
 
 ### Inventory and the stock ledger
 
@@ -314,6 +319,28 @@ customers and printers they use.
   (`cloudinary://...`) into `CLOUDINARY_URL` in `apps/api/.env`. Without it, the app runs and the
   upload slots say storage is not set up.
 
+### Seasonal collections
+
+- Four themed pages: Valentine’s Day, Easter, Halloween and Christmas, at `/s/<link>/c/<collection>`.
+  **Every collection starts hidden** and only an admin turns one on; nothing switches by date. A
+  hidden page answers 404 to visitors; the admin previews it full screen while signed in.
+- Each active collection adds a slide to a banner at the top of the main showcase. Several become a
+  carousel with arrows, dots, keyboard and swipe; it advances every 6 s, pauses on hover or focus,
+  and never moves for visitors who ask for reduced motion.
+- **Themes** live in a registry (`apps/web/src/features/showcase/themes/`, one file per season):
+  colors as CSS variables, an accent font loaded only when the theme shows, an original SVG
+  illustration, gentle motion (snow, hearts, confetti, bats) and closing copy. A new season is one
+  more file. All artwork is original, drawn for PrintBI.
+- **Two languages.** Every public page has a flag button (Brazil for Portuguese, Canada for English,
+  matching the app’s en-CA formatting). Pages start in the showcase language; the visitor’s choice
+  is remembered in their browser. Collection name, title, intro and banner exist in both languages;
+  an empty English text, or a missing English banner, falls back to Portuguese. Prices keep the
+  product’s currency.
+- **No new collection in MongoDB:** collections live in `companies.collections[]` (only edited
+  ones are stored; the rest use their defaults) and products join them through
+  `products.showcase.collections[]`. A product in a hidden collection still shows on the main
+  showcase when it is visible there.
+
 ### Printer catalog
 
 When adding a printer, users search a catalog of **162 FDM printers from 33 brands**. Picking one
@@ -373,7 +400,7 @@ about a minute to start; the test setup allows for that.
 1. Authentication, companies, members and roles
 2. Web shell, design system and settings
 3. Inventory (spools and lots, stock ledger) and expenses
-4. Catalog and customers · 4b public showcase (this part) · 4c seasonal showcases
+4. Catalog and customers · 4b public showcase · 4c seasonal showcases (this part)
 5. Calculator
 6. Quotes and PDF
 7. Orders and Kanban, stock consumption
@@ -387,10 +414,12 @@ Places where the business owner uploads their own photos or artwork. Each slot s
 recommended size in the app and keeps a placeholder until something is uploaded. More slots are
 added as features are built.
 
-| Slot           | Where it appears                                                      | Recommended size                       | Format / limit          |
-| -------------- | --------------------------------------------------------------------- | -------------------------------------- | ----------------------- |
-| Company logo   | Settings → Business; showcase header (later the quote PDF)            | 512 × 512 (square, transparent)        | PNG, SVG or WebP · 1 MB |
-| Product photos | Product page; showcase grid (first photo = cover) and product gallery | 1600 × 1600 (1:1), up to 8 per product | JPG, WebP or PNG · 5 MB |
+| Slot                            | Where it appears                                                      | Recommended size                                                                                                | Format / limit          |
+| ------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Company logo                    | Settings → Business; showcase header (later the quote PDF)            | 512 × 512 (square, transparent)                                                                                 | PNG, SVG or WebP · 1 MB |
+| Product photos                  | Product page; showcase grid (first photo = cover) and product gallery | 1600 × 1600 (1:1), up to 8 per product                                                                          | JPG, WebP or PNG · 5 MB |
+| Seasonal banner                 | Banner/carousel at the top of the main showcase (per collection)      | 1920 × 640 desktop (3:1) · 1080 × 1350 mobile (4:5); text inside the central 60% · Portuguese, English optional | JPG or WebP · 5 MB      |
+| Seasonal page header (optional) | Top of a seasonal page, instead of the illustration                   | 1920 × 800, both languages                                                                                      | JPG or WebP · 5 MB      |
 
 ## Data sources
 

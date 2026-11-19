@@ -13,6 +13,8 @@ import {
   usePageMeta,
 } from './PublicLayout';
 import { usePublicShowcase } from './queries';
+import { CollectionBanner } from './CollectionBanner';
+import { useShowcaseLanguage } from './language';
 import { stringsFor, type ShowcaseStrings } from './strings';
 
 export function PublicShowcasePage() {
@@ -22,7 +24,8 @@ export function PublicShowcasePage() {
   const [query, setQuery] = useState(params.get('q') ?? '');
   const deferred = useDeferredValue(query);
   const label = params.get('label') ?? '';
-  const t = stringsFor(data?.business.language ?? 'pt-BR');
+  const [language, setLanguage] = useShowcaseLanguage(data?.business.language);
+  const t = stringsFor(language);
   usePageMeta(data ? data.business.name : null, t.locale);
 
   const products = useMemo(() => {
@@ -54,7 +57,14 @@ export function PublicShowcasePage() {
   };
 
   return (
-    <PublicLayout business={business} t={t}>
+    <PublicLayout business={business} t={t} language={language} onLanguage={setLanguage}>
+      {data.collections.length > 0 && (
+        <CollectionBanner
+          collections={data.collections}
+          businessSlug={business.slug}
+          language={language}
+        />
+      )}
       <section className="flex flex-col gap-4 rounded-[var(--radius-card)] bg-surface p-6 sm:flex-row sm:items-center sm:gap-6 md:p-8">
         <BusinessMark business={business} size={88} />
         <div className="flex min-w-0 flex-col gap-2">

@@ -1,5 +1,6 @@
 import type {
   CategoryView,
+  CollectionView,
   CompanySettingsView,
   CompanyView,
   InviteView,
@@ -95,3 +96,10 @@ export function useSaving<TInput, TResult>(
 }
 
 export { base as companyBase };
+
+export const collectionKeys = ['showcase', 'collections'] as const;
+export const useCollections = () =>
+  useQuery({
+    queryKey: collectionKeys,
+    queryFn: () => api.get<CollectionView[]>(`${base}/showcase/collections`),
+  });

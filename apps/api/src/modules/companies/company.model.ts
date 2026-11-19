@@ -1,4 +1,5 @@
 import {
+  COLLECTION_KEYS,
   CURRENCIES,
   PRINTER_STATUSES,
   RISK_BASES,
@@ -130,6 +131,39 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   'Other',
 ] as const;
 
+const localizedSchema = new Schema(
+  { pt: { type: String, default: '' }, en: { type: String, default: '' } },
+  { _id: false },
+);
+const bannerSchema = new Schema(
+  {
+    desktop: { type: imageSchema, default: null },
+    mobile: { type: imageSchema, default: null },
+  },
+  { _id: false },
+);
+
+/**
+ * A seasonal collection (Valentine's Day, Easter, Halloween, Christmas). Only edited ones are
+ * stored; the rest use their defaults and stay hidden. Empty texts fall back to the defaults.
+ */
+const collectionSchema = new Schema(
+  {
+    key: { type: String, enum: COLLECTION_KEYS, required: true },
+    active: { type: Boolean, default: false },
+    name: { type: localizedSchema, default: () => ({}) },
+    title: { type: localizedSchema, default: () => ({}) },
+    intro: { type: localizedSchema, default: () => ({}) },
+    alt: { type: localizedSchema, default: () => ({}) },
+    banners: {
+      pt: { type: bannerSchema, default: () => ({}) },
+      en: { type: bannerSchema, default: () => ({}) },
+    },
+    header: { type: imageSchema, default: null },
+  },
+  { _id: false },
+);
+
 const companySchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -149,6 +183,7 @@ const companySchema = new Schema(
       whatsapp: { type: String, default: '' },
       messageTemplate: { type: String, default: '' },
     },
+    collections: { type: [collectionSchema], default: [] },
     settings: { type: settingsSchema, default: () => ({}) },
     printers: { type: [printerSchema], default: [] },
     labels: { type: [labelSchema], default: [] },

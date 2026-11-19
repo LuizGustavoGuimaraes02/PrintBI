@@ -31,6 +31,7 @@ import { applyServerErrors } from '../../lib/forms';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
 import { useCan } from '../auth/account';
 import { badgeLabel } from '../catalog/ProductShowcasePanel';
+import { CollectionsPanel } from './CollectionsPanel';
 import { keys, useSaving, useShowcaseProducts, useShowcaseSettings } from './queries';
 
 const toForm = (view: ShowcaseSettingsView): ShowcaseSettingsInput => ({
@@ -53,6 +54,7 @@ export function ShowcasePage() {
         description="What customers see when you share your link: the products you chose, with photos and a WhatsApp button."
       />
       {data ? <ShowcaseSettingsForm settings={data} /> : <PageLoader />}
+      <CollectionsPanel />
       <ShowcaseOrder />
     </>
   );

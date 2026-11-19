@@ -1,4 +1,10 @@
-import type { ProductShowcaseView, ProductView, ShowcaseBadge } from '@printbi/shared';
+import {
+  COLLECTION_DEFAULTS,
+  COLLECTION_KEYS,
+  type ProductShowcaseView,
+  type ProductView,
+  type ShowcaseBadge,
+} from '@printbi/shared';
 import { ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
@@ -38,6 +44,7 @@ export function ProductShowcasePanel({
         badge: next.badge,
         showPrice: next.showPrice,
         featured: next.featured,
+        collections: next.collections,
       });
       onChange(saved);
       if (patch.visible !== undefined) {
@@ -140,6 +147,40 @@ export function ProductShowcasePanel({
                 disabled={saving}
                 onCheckedChange={(featured) => void save({ featured })}
               />
+              <fieldset className="flex min-w-0 flex-col gap-2" disabled={saving}>
+                <legend className="mb-1 font-semibold">Seasonal collections</legend>
+                <p className="text-sm text-ink-muted">
+                  Also shown on these themed pages while they are turned on.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {COLLECTION_KEYS.map((key) => {
+                    const on = current.collections.includes(key);
+                    return (
+                      <label
+                        key={key}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2.5 rounded-[var(--radius-tile)] border-[1.5px] px-3 py-2.5 text-sm font-semibold',
+                          on ? 'border-teal bg-teal-soft' : 'border-rule hover:bg-bench',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-teal"
+                          checked={on}
+                          onChange={() =>
+                            void save({
+                              collections: on
+                                ? current.collections.filter((k) => k !== key)
+                                : [...current.collections, key],
+                            })
+                          }
+                        />
+                        {COLLECTION_DEFAULTS[key].name.en}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
             </>
           )}
           {settings && !settings.published && (
