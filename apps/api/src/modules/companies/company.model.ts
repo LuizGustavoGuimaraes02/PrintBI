@@ -40,6 +40,8 @@ const settingsSchema = new Schema(
       riskBase: { type: String, enum: RISK_BASES, default: 'filament' },
       quoteValidityDays: days(15),
       paymentTerms: { type: String, default: '', maxlength: 1000 },
+      /** Last time the defaults were saved; the setup checklist uses it. */
+      reviewedAt: { type: Date, default: null },
     },
     reminders: {
       enabled: { type: Boolean, default: true },

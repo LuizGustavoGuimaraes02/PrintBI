@@ -69,6 +69,8 @@ export interface CompanySettingsView {
     riskBase: 'filament' | 'materials' | 'total';
     quoteValidityDays: number;
     paymentTerms: string;
+    /** When the defaults were last saved; null while never reviewed. */
+    reviewedAt: string | null;
   };
   reminders: {
     enabled: boolean;

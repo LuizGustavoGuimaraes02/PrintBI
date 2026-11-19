@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import { Link } from 'react-router';
 import { cn, FilamentBar, PageHeader, Panel } from '../../design-system';
 import { useAccount, useCan } from '../auth/account';
-import { useCompany, useMembers, usePrinters } from '../settings/queries';
+import { useCompany, useMembers, usePrinters, useSettings } from '../settings/queries';
 
 interface Step {
   title: string;
@@ -18,6 +18,7 @@ export function HomePage() {
   const { data: company } = useCompany();
   const { data: printers } = usePrinters();
   const { data: members } = useMembers();
+  const { data: settings } = useSettings();
 
   const steps: Step[] = [
     {
@@ -36,7 +37,7 @@ export function HomePage() {
       title: 'Review calculator defaults',
       detail: 'Energy price, labor rate, margin and quote terms.',
       to: '/settings/calculator',
-      done: false,
+      done: Boolean(settings?.calculator.reviewedAt),
     },
     {
       title: 'Invite your team',

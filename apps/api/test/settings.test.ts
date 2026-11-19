@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { CompanyModel } from '../src/modules/companies/company.model';
 import { createApp } from '../src/app';
 import { registerClient, registerWithCompany } from './client';
 import { connectTestDatabase } from './memory-db';
@@ -173,5 +174,37 @@ describe('expense categories', () => {
       name: 'Shipping',
     });
     expect(again.status).toBe(201);
+  });
+});
+
+describe('calculator review for the setup checklist', () => {
+  it('stays unreviewed until the calculator defaults are saved', async () => {
+    const { client } = await registerWithCompany(app);
+    const before = (await client.get('/api/v1/companies/current/settings')).body;
+    expect(before.calculator.reviewedAt).toBeNull();
+    // Saving another section does not count.
+    await client.patch('/api/v1/companies/current/settings', {
+      reminders: before.reminders,
+    });
+    expect(
+      (await client.get('/api/v1/companies/current/settings')).body.calculator.reviewedAt,
+    ).toBeNull();
+
+    const saved = await client.patch('/api/v1/companies/current/settings', { calculator });
+    expect(saved.body.calculator.reviewedAt).toEqual(expect.any(String));
+  });
+
+  it('recognizes a calculator saved before the field existed, from the audit log', async () => {
+    const { client, companyId } = await registerWithCompany(app);
+    await client.patch('/api/v1/companies/current/settings', { calculator });
+    // Simulate data from before reviewedAt existed.
+    await CompanyModel.updateOne(
+      { _id: companyId },
+      { $set: { 'settings.calculator.reviewedAt': null } },
+    );
+    const view = (await client.get('/api/v1/companies/current/settings')).body;
+    expect(view.calculator.reviewedAt).toEqual(expect.any(String));
+    const stored = await CompanyModel.findById(companyId, { settings: 1 }).lean();
+    expect(stored?.settings?.calculator?.reviewedAt).toBeInstanceOf(Date);
   });
 });

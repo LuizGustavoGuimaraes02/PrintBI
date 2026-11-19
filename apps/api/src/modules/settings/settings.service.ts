@@ -3,6 +3,7 @@ import type { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
 import { NotFoundError } from '../../core/errors';
+import { AuditLogModel } from '../../core/audit/audit-log.model';
 import { CompanyModel } from '../companies/company.model';
 
 type SettingsDoc = NonNullable<InstanceType<typeof CompanyModel>['settings']>;
@@ -29,6 +30,7 @@ function toView(settings: SettingsDoc): CompanySettingsView {
       riskBase: calculator?.riskBase ?? 'filament',
       quoteValidityDays: calculator?.quoteValidityDays ?? 15,
       paymentTerms: calculator?.paymentTerms ?? '',
+      reviewedAt: calculator?.reviewedAt?.toISOString() ?? null,
     },
     reminders: {
       enabled: reminders?.enabled ?? true,
@@ -51,7 +53,24 @@ async function loadSettings(companyId: Types.ObjectId): Promise<SettingsDoc> {
 }
 
 export async function getSettings(companyId: Types.ObjectId): Promise<CompanySettingsView> {
-  return toView(await loadSettings(companyId));
+  const settings = await loadSettings(companyId);
+  if (settings.calculator && !settings.calculator.reviewedAt) {
+    // Saved before reviewedAt existed: the audit log knows when the calculator was last saved.
+    const saved = await AuditLogModel.findOne(
+      { companyId, action: 'settings.updated', 'changes.calculator': { $exists: true } },
+      { createdAt: 1 },
+    )
+      .sort({ createdAt: -1 })
+      .lean();
+    if (saved?.createdAt) {
+      await CompanyModel.updateOne(
+        { _id: companyId, 'settings.calculator.reviewedAt': null },
+        { $set: { 'settings.calculator.reviewedAt': saved.createdAt } },
+      );
+      settings.calculator.reviewedAt = saved.createdAt;
+    }
+  }
+  return toView(settings);
 }
 
 export async function updateSettings(
@@ -70,7 +89,8 @@ export async function updateSettings(
         input.currency.brlPerCad === null ? null : new Date();
     }
   }
-  if (input.calculator) set['settings.calculator'] = input.calculator;
+  if (input.calculator)
+    set['settings.calculator'] = { ...input.calculator, reviewedAt: new Date() };
   if (input.reminders) set['settings.reminders'] = input.reminders;
   if (input.board) set['settings.board'] = input.board;
   if (input.inventory) set['settings.inventory'] = input.inventory;
