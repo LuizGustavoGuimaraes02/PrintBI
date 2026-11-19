@@ -13,10 +13,13 @@ import { logger } from './core/logger';
 import { authRouter } from './modules/auth/auth.routes';
 import { companiesRouter } from './modules/companies/companies.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { customersRouter } from './modules/customers/customers.routes';
 import { expensesRouter } from './modules/expenses/expenses.routes';
 import { filamentCatalogRouter } from './modules/filament-catalog/filament-catalog.routes';
 import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { invitesRouter } from './modules/invites/invites.routes';
+import { labelsRouter } from './modules/labels/labels.routes';
+import { productsRouter } from './modules/products/products.routes';
 import { printerCatalogRouter } from './modules/printer-catalog/printer-catalog.routes';
 
 export interface AppOptions {
@@ -58,6 +61,9 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/filament-products', filamentCatalogRouter);
   api.use('/inventory', inventoryRouter);
   api.use('/expenses', expensesRouter);
+  api.use('/labels', labelsRouter);
+  api.use('/products', productsRouter);
+  api.use('/customers', customersRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

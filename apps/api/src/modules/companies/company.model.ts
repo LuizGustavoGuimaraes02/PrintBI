@@ -88,6 +88,13 @@ const printerSchema = new Schema({
   archivedAt: { type: Date, default: null },
 });
 
+/** Product labels (Keychain, Fridge magnet...), shared by the catalog, sales filters and showcase. */
+const labelSchema = new Schema({
+  name: { type: String, required: true, trim: true },
+  color: { type: String, default: '#E2F1F3' },
+  archivedAt: { type: Date, default: null },
+});
+
 const categorySchema = new Schema({
   name: { type: String, required: true, trim: true },
   archivedAt: { type: Date, default: null },
@@ -117,6 +124,7 @@ const companySchema = new Schema(
     social: { type: String, trim: true },
     settings: { type: settingsSchema, default: () => ({}) },
     printers: { type: [printerSchema], default: [] },
+    labels: { type: [labelSchema], default: [] },
     expenseCategories: {
       type: [categorySchema],
       default: () => DEFAULT_EXPENSE_CATEGORIES.map((name) => ({ name })),

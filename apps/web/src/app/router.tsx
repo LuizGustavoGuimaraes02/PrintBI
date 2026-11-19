@@ -16,6 +16,8 @@ const auth = () => import('../features/auth/pages');
 const settings = () => import('../features/settings/pages');
 const inventory = () => import('../features/inventory/pages');
 const expenses = () => import('../features/expenses/pages');
+const catalog = () => import('../features/catalog/pages');
+const customers = () => import('../features/customers/pages');
 
 const placeholders: RouteObject[] = NAV_ITEMS.filter((item) => item.part).map((item) => ({
   path: item.to.slice(1),
@@ -55,6 +57,11 @@ export const routes: RouteObject[] = [
               { path: 'expenses', ...page(expenses, 'ExpensesPage') },
               { path: 'expenses/new', ...page(expenses, 'NewExpensePage') },
               { path: 'expenses/:expenseId', ...page(expenses, 'ExpensePage') },
+              { path: 'products', ...page(catalog, 'ProductsPage') },
+              { path: 'products/new', ...page(catalog, 'NewProductPage') },
+              { path: 'products/:productId', ...page(catalog, 'ProductPage') },
+              { path: 'customers', ...page(customers, 'CustomersPage') },
+              { path: 'customers/:customerId', ...page(customers, 'CustomerPage') },
               {
                 path: 'settings',
                 ...page(settings, 'SettingsLayout'),

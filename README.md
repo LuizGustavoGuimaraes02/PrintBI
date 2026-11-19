@@ -4,7 +4,7 @@ Business manager for small 3D-printing shops: filament spools and consumables, e
 catalog, customers, a manual cost calculator, quote PDFs, a production Kanban, sales and profit,
 a dashboard, and a public product showcase.
 
-> Status: **Part 3 - Inventory, stock ledger and expenses**. Features arrive in parts; see
+> Status: **Part 4 - Catalog, labels and customers**. Features arrive in parts; see
 > [Roadmap](#roadmap).
 
 ## Stack
@@ -171,6 +171,12 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | POST, PATCH       | `/expenses[/:id]`                                  | `finance:manage`                     |
 | POST, DELETE      | `/expenses/:id/payments[/:paymentId]`              | `finance:manage` (POST: key)         |
 | POST              | `/expenses/:id/cancel`                             | `finance:manage` + `records:archive` |
+| GET, POST         | `/labels`                                          | Member                               |
+| PATCH             | `/labels/:id`                                      | Member                               |
+| GET, POST, PUT    | `/products[/:id]`                                  | Member (cost needs `finance:view`)   |
+| POST              | `/products/:id/archive`                            | `records:archive`                    |
+| GET, POST, PUT    | `/customers[/:id]`                                 | Member                               |
+| POST              | `/customers/:id/archive`                           | `records:archive`                    |
 
 ### Inventory and the stock ledger
 
@@ -212,6 +218,26 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
   made in the period, whatever the purchase date) and **still to pay**, per currency. Cancelled
   expenses stay on record but leave the totals.
 - Only members with financial access see expenses; cancelling also needs the archive permission.
+
+### Catalog, labels and customers
+
+- **Products and services** share one collection: type, name, description, labels, usual price,
+  sale unit (per piece, per hour, per job or a custom unit), estimated cost, private notes, and for
+  products the size of a typical piece (width × depth × height in mm) and the filament it uses.
+  Quotes and sales start from these values and can change them. The same document will feed the
+  public showcase (Part 4b).
+- The **estimated cost** is removed from responses for members without financial access, and their
+  edits never overwrite it.
+- **Labels** (Keychain, Fridge magnet, Gift...) live inside the company document, not in a
+  collection of their own. They are created on the spot from the product form, with a color, and
+  managed in one dialog that shows how many products use each. Names are unique per business,
+  ignoring case. Archiving a label keeps it on the products that already carry it, but it can't be
+  added to new ones.
+- **Customers** need only a name; company, phone or WhatsApp, email, address and notes are optional.
+  Search covers name, company, phone and email. The create dialog is a standalone component, so
+  quotes, orders and sales can add a customer without leaving the screen. The customer page links
+  straight to WhatsApp, a call or an email.
+- Products and customers are archived, never deleted, so past quotes and sales keep them.
 
 ### Printer catalog
 
@@ -271,8 +297,8 @@ about a minute to start; the test setup allows for that.
 0. Foundation
 1. Authentication, companies, members and roles
 2. Web shell, design system and settings
-3. Inventory (spools and lots, stock ledger) and expenses (this part)
-4. Catalog and customers · 4b public showcase · 4c seasonal showcases
+3. Inventory (spools and lots, stock ledger) and expenses
+4. Catalog and customers (this part) · 4b public showcase · 4c seasonal showcases
 5. Calculator
 6. Quotes and PDF
 7. Orders and Kanban, stock consumption
@@ -286,9 +312,10 @@ Places where the business owner uploads their own photos or artwork. Each slot s
 recommended size in the app and keeps a placeholder until something is uploaded. Uploads arrive
 with image storage in Part 4b; more slots are added as features are built.
 
-| Slot         | Where it appears                            | Recommended size                | Format / limit          |
-| ------------ | ------------------------------------------- | ------------------------------- | ----------------------- |
-| Company logo | Settings, quote PDF header, showcase header | 512 × 512 (square, transparent) | PNG, SVG or WebP · 1 MB |
+| Slot           | Where it appears                                     | Recommended size                       | Format / limit          |
+| -------------- | ---------------------------------------------------- | -------------------------------------- | ----------------------- |
+| Company logo   | Settings, quote PDF header, showcase header          | 512 × 512 (square, transparent)        | PNG, SVG or WebP · 1 MB |
+| Product photos | Product form, showcase grid (cover) and product page | 1600 × 1600 (1:1), up to 8 per product | JPG, WebP or PNG · 5 MB |
 
 ## Data sources
 

@@ -8,5 +8,7 @@ export default defineProject({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['src/test/setup.ts'],
+    // Typing whole forms with user-event takes a few seconds while the API suite runs alongside.
+    testTimeout: 20_000,
   },
 });

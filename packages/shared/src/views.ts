@@ -301,3 +301,51 @@ export const FILAMENT_CATALOG_ATTRIBUTION = {
   licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
   note: 'FDM filaments only; material names normalized and fields selected for PrintBI.',
 } as const;
+
+export interface LabelView {
+  id: string;
+  name: string;
+  color: string;
+  archived: boolean;
+  /** Active products and services using it. */
+  productCount: number;
+}
+
+export interface ProductView {
+  id: string;
+  type: 'product' | 'service';
+  name: string;
+  description: string;
+  labels: { id: string; name: string; color: string }[];
+  price: Money | null;
+  /** Null without `finance:view`. */
+  estimatedCost: Money | null;
+  saleUnit: 'unit' | 'hour' | 'service' | 'custom';
+  customUnit: string;
+  specs: {
+    widthMm: number | null;
+    depthMm: number | null;
+    heightMm: number | null;
+    filamentGrams: number | null;
+  };
+  notes: string;
+  archived: boolean;
+  /** Units sold so far; filled once sales exist. */
+  soldQuantity: number;
+  updatedAt: string;
+}
+
+export interface CustomerView {
+  id: string;
+  name: string;
+  company: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  archived: boolean;
+  /** Filled once sales exist (Part 8). */
+  salesCount: number;
+  totalPurchased: Money[];
+  createdAt: string;
+}
