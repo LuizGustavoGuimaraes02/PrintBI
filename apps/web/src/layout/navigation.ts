@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/products', label: 'Products & Services', icon: Package },
   { to: '/sales', label: 'Sales & Profit', icon: TrendingUp, part: '8' },
   { to: '/calculator', label: 'Calculator', icon: Calculator },
-  { to: '/quotes', label: 'Quotes', icon: FileText, part: '6' },
+  { to: '/quotes', label: 'Quotes', icon: FileText },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/showcase', label: 'Showcase', icon: Store },
   { to: '/settings', label: 'Settings', icon: Settings },

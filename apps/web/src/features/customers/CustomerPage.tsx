@@ -88,6 +88,12 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
         description={customer.company || undefined}
         actions={
           <>
+            <Link
+              to={`/quotes/new?customer=${customer.id}`}
+              className="inline-flex h-12 items-center rounded-full bg-teal px-6 text-[15px] font-bold text-white hover:bg-teal-strong"
+            >
+              Create quote
+            </Link>
             <Button variant="soft" onClick={() => setEditing(true)}>
               Edit
             </Button>

@@ -184,6 +184,11 @@ const companySchema = new Schema(
       messageTemplate: { type: String, default: '' },
     },
     collections: { type: [collectionSchema], default: [] },
+    /** Sequence numbers, raised atomically with $inc: ORC-0001, VEN-0001. */
+    counters: {
+      quote: { type: Number, default: 0 },
+      sale: { type: Number, default: 0 },
+    },
     settings: { type: settingsSchema, default: () => ({}) },
     printers: { type: [printerSchema], default: [] },
     labels: { type: [labelSchema], default: [] },

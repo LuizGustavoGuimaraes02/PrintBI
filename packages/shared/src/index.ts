@@ -13,3 +13,5 @@ export * from './schemas/catalog';
 export * from './schemas/showcase';
 export * from './calculator';
 export * from './schemas/calculator';
+export * from './quotes';
+export * from './schemas/quote';

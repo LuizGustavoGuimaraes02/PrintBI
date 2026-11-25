@@ -6,6 +6,7 @@ import type { Money } from './money';
 import type { Permission, Role } from './permissions';
 import type { CalcResult } from './calculator';
 import type { CalcInput } from './schemas/calculator';
+import type { BreakdownRow } from './quotes';
 
 export interface AccountView {
   user: { id: string; firstName: string; lastName: string; email: string };
@@ -567,4 +568,78 @@ export interface CalculationView extends CalculationSummaryView {
   notes: string;
   input: CalcInput;
   result: CalcResult;
+}
+
+export interface QuoteLineView {
+  productId: string | null;
+  calculationId: string | null;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  discount: number;
+  /** Quantity × unit price, rounded, minus the discount. */
+  amount: number;
+  /** Cost components from the linked calculation; null without financial access or when none. */
+  breakdown: BreakdownRow[] | null;
+  /** The quantity the breakdown was worked out for; a different line quantity hides it. */
+  breakdownQuantity: number | null;
+}
+
+export interface QuoteHistoryView {
+  status: 'draft' | 'sent' | 'approved' | 'rejected' | 'cancelled';
+  at: string;
+  by: string;
+  note: string;
+}
+
+export interface QuoteView {
+  id: string;
+  number: number;
+  code: string;
+  title: string;
+  language: 'pt-BR' | 'en';
+  currency: 'CAD' | 'BRL';
+  issuedAt: string;
+  validUntil: string | null;
+  status: QuoteHistoryView['status'];
+  displayStatus: QuoteHistoryView['status'] | 'expired';
+  customerId: string | null;
+  customer: { name: string; company: string; email: string; phone: string; address: string };
+  lines: QuoteLineView[];
+  discount: number;
+  delivery: number;
+  taxes: { label: string; percent: number; amount: number }[];
+  subtotal: number;
+  taxBase: number;
+  total: number;
+  showBreakdown: boolean;
+  leadTime: string;
+  deliveryMethod: string;
+  paymentTerms: string;
+  notes: string;
+  privateNotes: string;
+  history: QuoteHistoryView[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteSummaryView {
+  id: string;
+  code: string;
+  title: string;
+  customerName: string;
+  issuedAt: string;
+  validUntil: string | null;
+  status: QuoteView['status'];
+  displayStatus: QuoteView['displayStatus'];
+  total: Money;
+}
+
+export interface QuoteListView {
+  quotes: QuoteSummaryView[];
+  /** Over every quote of the business, whatever the filters. */
+  counts: Record<QuoteView['displayStatus'], number>;
+  /** Quotes that were sent at some point (sent, approved, rejected or expired after sending). */
+  sentCount: number;
 }

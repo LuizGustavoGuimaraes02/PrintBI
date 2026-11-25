@@ -1,0 +1,82 @@
+import type { BreakdownKind, QuoteLanguage } from '@printbi/shared';
+
+/**
+ * Fixed words of the quote PDF. Only these are translated: what the business typed (items,
+ * notes, terms) stays exactly as written.
+ */
+export const PDF_LABELS = {
+  'pt-BR': {
+    locale: 'pt-BR',
+    quote: 'Orçamento',
+    issued: 'Data',
+    validUntil: 'Válido até',
+    to: 'Para',
+    description: 'Descrição',
+    quantity: 'Qtd.',
+    unitPrice: 'Preço unit.',
+    amount: 'Valor',
+    discount: 'Desconto',
+    subtotal: 'Subtotal',
+    delivery: 'Entrega',
+    total: 'Total',
+    estimatedCost: 'Custo estimado de produção',
+    addedProfit: 'Lucro adicionado',
+    leadTime: 'Prazo de produção e entrega',
+    deliveryMethod: 'Forma de entrega',
+    paymentTerms: 'Pagamento',
+    notes: 'Observações',
+    estimate:
+      'Quantidades de material e tempo são estimativas até a produção. Os preços de compra unitários são reais; o total final de produção pode variar.',
+    thanks: 'Obrigado pela preferência!',
+    page: 'Página',
+    of: 'de',
+    kinds: {
+      filament: 'Filamento',
+      material: 'Material',
+      energy: 'Energia estimada',
+      labor: 'Mão de obra',
+      machine: 'Tempo de impressora',
+      risk: 'Margem para perdas',
+      fees: 'Taxas',
+    } satisfies Record<BreakdownKind, string>,
+    units: { g: 'g', h: 'h', unit: 'un.', kwh: 'kWh' },
+  },
+  en: {
+    locale: 'en-CA',
+    quote: 'Quote',
+    issued: 'Date',
+    validUntil: 'Valid until',
+    to: 'For',
+    description: 'Description',
+    quantity: 'Qty',
+    unitPrice: 'Unit price',
+    amount: 'Amount',
+    discount: 'Discount',
+    subtotal: 'Subtotal',
+    delivery: 'Delivery',
+    total: 'Total',
+    estimatedCost: 'Estimated production cost',
+    addedProfit: 'Added profit',
+    leadTime: 'Production and delivery time',
+    deliveryMethod: 'Delivery',
+    paymentTerms: 'Payment',
+    notes: 'Notes',
+    estimate:
+      'Material and time quantities are estimates until production. Unit purchase prices are real; the final production total may vary.',
+    thanks: 'Thank you for your business!',
+    page: 'Page',
+    of: 'of',
+    kinds: {
+      filament: 'Filament',
+      material: 'Material',
+      energy: 'Estimated electricity',
+      labor: 'Labor',
+      machine: 'Printer time',
+      risk: 'Waste allowance',
+      fees: 'Fees',
+    } satisfies Record<BreakdownKind, string>,
+    units: { g: 'g', h: 'h', unit: 'pcs', kwh: 'kWh' },
+  },
+} as const;
+
+export type PdfLabels = (typeof PDF_LABELS)[QuoteLanguage];

@@ -917,9 +917,18 @@ function CalculatorEditor({
                 {saved ? 'Save changes' : 'Save calculation'}
               </Button>
             </div>
-            <p className="text-right text-[12px] text-ink-muted">
-              Quotes and sales from a calculation arrive in Parts 6 and 8.
-            </p>
+            {saved ? (
+              <Link
+                to={`/quotes/new?calculation=${saved.id}`}
+                className="inline-flex h-11 items-center justify-center rounded-full bg-teal-soft px-5 text-sm font-bold text-teal-ink hover:bg-[#d3eaee]"
+              >
+                Create a quote from it
+              </Link>
+            ) : (
+              <p className="text-right text-[12px] text-ink-muted">
+                Save it to make a quote from it. Sales arrive in Part 8.
+              </p>
+            )}
           </Panel>
         </aside>
       </div>

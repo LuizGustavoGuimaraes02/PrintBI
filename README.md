@@ -193,6 +193,10 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | GET               | `/public/showcase/:slug[/:productSlug]`                | Public, own rate limit, cached 60 s     |
 | GET, POST         | `/calculations`                                        | `finance:view`                          |
 | GET, PUT, DELETE  | `/calculations/:id`                                    | `finance:view`                          |
+| GET, POST         | `/quotes`                                              | Member                                  |
+| GET, PUT          | `/quotes/:id`                                          | Member                                  |
+| DELETE            | `/quotes/:id`                                          | `records:archive`                       |
+| POST              | `/quotes/:id/actions`                                  | Member (send, approve, reject, …)       |
 | GET               | `/public/showcase/:slug/c/:collectionSlug`             | Public; 404 while the collection is off |
 | GET               | `/companies/current/showcase/collections`              | Member                                  |
 | PUT               | `/companies/current/showcase/collections/:key`         | `showcase:manage`                       |
@@ -365,6 +369,26 @@ customers and printers they use.
 - Saved calculations keep their inputs and result as a snapshot. Saving can also write the unit
   cost into the linked product's estimated cost. The calculator needs `finance:view`.
 
+### Quotes and PDF
+
+- A quote has a customer (picked from the customers, whose details are copied in, or typed for a
+  one-off), items, a discount, delivery, any number of taxes, dates and terms. Numbers come from
+  an atomic counter per company: ORC-0001, ORC-0002, … never reused, even after a delete.
+- **Totals:** each line is rounded to cents first; subtotal − discount + delivery is the tax
+  base; each tax is a percentage of it. `packages/shared/src/quotes.ts` adds up live in the
+  browser and again on the server when the quote is saved.
+- Items can start from a product (its price) or a saved calculation (its price, quantity and cost
+  breakdown). The PDF can show that breakdown, estimated production cost and added profit under
+  the item. Only members with `finance:view` see or change it; others never receive it.
+- **Status:** draft → sent → approved, rejected or cancelled; any closed quote can be reopened as a
+  draft. A draft or sent quote past its valid-until date shows as expired. Approved, rejected and
+  cancelled quotes are locked. Every change of status is kept in the quote's history.
+- **PDF in Portuguese or English**, made in the browser with `@react-pdf/renderer` from the saved
+  quote, with the company's logo, contact details and terms. The fonts are self-hosted. The PDF
+  uses Schibsted Grotesk only, because the engine can't embed IBM Plex Mono's accented letters.
+  The fonts are registered again before each PDF: the engine drops letters a second document
+  uses for the first time when it reuses a loaded font.
+
 ### Printer catalog
 
 When adding a printer, users search a catalog of **162 FDM printers from 33 brands**. Picking one
@@ -425,8 +449,8 @@ about a minute to start; the test setup allows for that.
 2. Web shell, design system and settings
 3. Inventory (spools and lots, stock ledger) and expenses
 4. Catalog and customers · 4b public showcase · 4c seasonal showcases
-5. Calculator (this part)
-6. Quotes and PDF
+5. Calculator
+6. Quotes and PDF (this part)
 7. Orders and Kanban, stock consumption
 8. Sales and profit
 9. Dashboard and reminders
