@@ -30,6 +30,7 @@ import {
   TextAreaField,
   TextField,
   useToast,
+  Hint,
 } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard';
@@ -249,12 +250,18 @@ function QuoteEditor({
             <>
               {(quote.status === 'draft' || quote.status === 'sent') && (
                 <>
-                  <Button variant="soft" loading={busy === 'send'} onClick={() => void act('send')}>
+                  <Button
+                    variant="soft"
+                    loading={busy === 'send'}
+                    hint="Records that you sent it to the customer. Nothing is sent from here: share the PDF yourself."
+                    onClick={() => void act('send')}
+                  >
                     {quote.status === 'sent' ? 'Mark sent again' : 'Mark sent'}
                   </Button>
                   <Button
                     variant="soft"
                     loading={busy === 'approve'}
+                    hint="The customer said yes. The quote locks; the printing order is created only when you click Create printing order."
                     onClick={() => void act('approve')}
                   >
                     Approved
@@ -262,6 +269,7 @@ function QuoteEditor({
                   <Button
                     variant="ghost"
                     loading={busy === 'reject'}
+                    hint="The customer said no. The quote locks and stays in the list; Reopen brings it back."
                     onClick={() => void act('reject')}
                   >
                     Rejected
@@ -269,16 +277,37 @@ function QuoteEditor({
                   <Button
                     variant="ghost"
                     loading={busy === 'cancel'}
+                    hint="You called it off. It locks and stays in the list; Reopen brings it back."
                     onClick={() => void act('cancel')}
                   >
                     Cancel quote
                   </Button>
                 </>
               )}
+              {quote.orderId ? (
+                <Link
+                  to={`/orders?card=${quote.orderId}`}
+                  className="inline-flex h-12 items-center rounded-full bg-teal px-6 text-[15px] font-bold text-white hover:bg-teal-strong"
+                >
+                  Open its order
+                </Link>
+              ) : (
+                quote.status === 'approved' && (
+                  <Hint text="Opens a new order filled from this quote for you to review. Nothing is created until you save it.">
+                    <Link
+                      to={`/orders/new?quote=${quote.id}`}
+                      className="inline-flex h-12 items-center rounded-full bg-teal px-6 text-[15px] font-bold text-white hover:bg-teal-strong"
+                    >
+                      Create printing order
+                    </Link>
+                  </Hint>
+                )
+              )}
               {locked && (
                 <Button
                   variant="soft"
                   loading={busy === 'reopen'}
+                  hint="Turns it back into a draft you can edit. Its history is kept."
                   onClick={() => void act('reopen')}
                 >
                   Reopen
@@ -685,6 +714,7 @@ function QuoteEditor({
                   title={`Delete ${quote.code}?`}
                   description="For a quote made by mistake. One that was sent and declined is better marked Rejected or Cancelled, to keep the history."
                   confirmLabel="Delete quote"
+                  hint="Deletes it for good, for a quote made by mistake. Rejected or Cancelled keep the history."
                   onDelete={async () => {
                     try {
                       await api.delete(`/quotes/${quote.id}`);

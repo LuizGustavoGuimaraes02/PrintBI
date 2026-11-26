@@ -96,7 +96,12 @@ function MembersPanel({ canManage }: { canManage: boolean }) {
                   ) : (
                     <span className="text-sm text-ink-muted">Admins always see finances</span>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => setRemoving(member)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    hint="They lose access to this business right away. What they recorded stays."
+                    onClick={() => setRemoving(member)}
+                  >
                     Remove
                   </Button>
                 </>
@@ -223,7 +228,11 @@ function InvitesPanel() {
           </div>
         )}
         <div className="md:col-span-2">
-          <Button type="submit" loading={create.isPending}>
+          <Button
+            type="submit"
+            loading={create.isPending}
+            hint="Makes a link for this email, usable once and for 7 days. Nothing is emailed: copy it and send it yourself."
+          >
             Create invite link
           </Button>
         </div>
@@ -272,6 +281,7 @@ function InvitesPanel() {
                 variant="ghost"
                 size="sm"
                 loading={revoke.isPending && revoke.variables === invite.id}
+                hint="The link stops working right away."
                 onClick={() => revoke.mutate(invite.id)}
               >
                 Cancel invite

@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from './cn';
+import { Hint } from './Hint';
 
 type Variant = 'primary' | 'soft' | 'ghost' | 'danger';
 type Size = 'md' | 'sm';
@@ -21,6 +22,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: Size;
   loading?: boolean;
   icon?: ReactNode;
+  /** What clicking will do, shown on hover and focus. Use it when the effect isn't obvious. */
+  hint?: ReactNode;
 }
 
 export function Button({
@@ -28,13 +31,14 @@ export function Button({
   size = 'md',
   loading = false,
   icon,
+  hint,
   className,
   children,
   disabled,
   type = 'button',
   ...rest
 }: ButtonProps) {
-  return (
+  const button = (
     <button
       type={type}
       disabled={disabled || loading}
@@ -51,6 +55,17 @@ export function Button({
       {loading ? <ExtrudingDots /> : icon}
       {children}
     </button>
+  );
+  if (!hint) return button;
+  // A disabled button gets no pointer events, so the hint sits on a wrapper it can't block.
+  return disabled || loading ? (
+    <Hint text={hint}>
+      <span tabIndex={0} className="inline-flex rounded-full">
+        {button}
+      </span>
+    </Hint>
+  ) : (
+    <Hint text={hint}>{button}</Hint>
   );
 }
 

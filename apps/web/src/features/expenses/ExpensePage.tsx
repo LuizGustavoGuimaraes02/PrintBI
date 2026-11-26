@@ -119,10 +119,19 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage && open && expense.outstanding > 0 && (
-            <Button onClick={() => setPaying(true)}>Record payment</Button>
+            <Button
+              hint="Records money you paid toward this expense. What is still owed goes down."
+              onClick={() => setPaying(true)}
+            >
+              Record payment
+            </Button>
           )}
           {canManage && canArchive && open && (
-            <Button variant="ghost" onClick={() => setCancelling(true)}>
+            <Button
+              variant="ghost"
+              hint="For an expense that was called off: it stays on record but stops counting in totals."
+              onClick={() => setCancelling(true)}
+            >
               Cancel expense
             </Button>
           )}
@@ -130,6 +139,7 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
             <Button
               variant="ghost"
               className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+              hint="Deletes it with its payments, for an expense entered by mistake. Cancel keeps it on record."
               onClick={() => setDeleting('confirm')}
             >
               Delete
@@ -221,6 +231,7 @@ function ExpenseDetail({ expense }: { expense: ExpenseView }) {
                     size="sm"
                     variant="ghost"
                     icon={<Trash2 size={16} aria-hidden="true" />}
+                    hint="Removes a payment recorded by mistake. The change stays in the audit log."
                     onClick={() => setRemoving(p.id)}
                   >
                     Remove

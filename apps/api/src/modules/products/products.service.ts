@@ -11,6 +11,7 @@ import {
 import type { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
+import { assertNotInOrders } from '../orders/order-links';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { deleteImage, imageView, type StoredImage } from '../../core/media/cloudinary';
 import { confirmUpload, productImageRule } from '../../core/media/uploads';
@@ -442,6 +443,7 @@ export async function deleteProduct(
   actorId: Types.ObjectId,
   id: Types.ObjectId,
 ): Promise<void> {
+  await assertNotInOrders(companyId, 'product', id);
   const product = (await ProductModel.findOneAndDelete(
     { _id: id, companyId },
     { projection: { name: 1, images: 1 } },

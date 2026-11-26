@@ -218,7 +218,11 @@ function CalculatorEditor({
                 New
               </Button>
             ) : (
-              <Button variant="ghost" onClick={() => setForm(reset())}>
+              <Button
+                variant="ghost"
+                hint="Empties the form. Saved calculations are not touched."
+                onClick={() => setForm(reset())}
+              >
                 Clear
               </Button>
             )}
@@ -900,6 +904,7 @@ function CalculatorEditor({
                   title={`Delete ${saved.name}?`}
                   description="The saved calculation is removed. Products and quotes made from it keep their own values."
                   confirmLabel="Delete calculation"
+                  hint="Deletes this saved calculation. Products and quotes made from it keep their values."
                   onDelete={async () => {
                     try {
                       await api.delete(`/calculations/${saved.id}`);

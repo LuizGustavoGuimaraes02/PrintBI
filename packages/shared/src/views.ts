@@ -7,6 +7,16 @@ import type { Permission, Role } from './permissions';
 import type { CalcResult } from './calculator';
 import type { CalcInput } from './schemas/calculator';
 import type { BreakdownRow } from './quotes';
+import type { StaleReminder } from './orders';
+import type {
+  BlockReason,
+  LegacyStatus,
+  OrderPriority,
+  OrderStatus,
+  OrderType,
+  PaymentStatus,
+  RecipientKind,
+} from './schemas/order';
 
 export interface AccountView {
   user: { id: string; firstName: string; lastName: string; email: string };
@@ -620,6 +630,8 @@ export interface QuoteView {
   notes: string;
   privateNotes: string;
   history: QuoteHistoryView[];
+  /** The order made from this quote, if any. */
+  orderId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -642,4 +654,125 @@ export interface QuoteListView {
   counts: Record<QuoteView['displayStatus'], number>;
   /** Quotes that were sent at some point (sent, approved, rejected or expired after sending). */
   sentCount: number;
+}
+
+export interface OrderCostView {
+  /** What the stock used for this order cost, per currency, after corrections. */
+  materials: Money[];
+  /** Failed prints and waste recorded against the order. */
+  losses: Money[];
+  /** Lines from rolls or lots with no known cost. */
+  unpricedLines: number;
+}
+
+/** A roll from stock picked for an order, with what it needs to draw its spool. */
+export interface OrderFilamentView {
+  itemId: string;
+  name: string;
+  /** Null when the roll was deleted from stock since. */
+  filament: Pick<FilamentSpecView, 'colorKey' | 'colorHex' | 'materialType'> | null;
+  /** The file's estimate in micro-units of grams; null when unknown. */
+  grams: number | null;
+}
+
+/** A card on the board, or a row in the list. */
+export interface OrderCardView {
+  id: string;
+  title: string;
+  type: OrderType;
+  status: OrderStatus;
+  rank: string;
+  quantity: number;
+  recipient: { kind: RecipientKind; customerId: string | null; name: string };
+  product: { id: string; name: string } | null;
+  labelIds: string[];
+  dueDate: string | null;
+  priority: OrderPriority;
+  printer: { id: string; name: string } | null;
+  paymentStatus: PaymentStatus;
+  /** What the card is waiting for (quote approval, filament…); it stays in its column. */
+  blocked: { reason: BlockReason; note: string; since: string } | null;
+  filaments: OrderFilamentView[];
+  /** The card picture (from the print file or chosen), or null. Changes when it is replaced. */
+  pictureUrl: string | null;
+  /** Stock lines recorded against the order (corrections included). Zero shows "Confirm print". */
+  usageCount: number;
+  /** Past the due date and not completed. */
+  overdue: boolean;
+  /** Sitting in its column past the reminder threshold, unless snoozed. */
+  stale: StaleReminder | null;
+  snoozedUntil: string | null;
+  /** Done long enough ago to be off the active board (still searchable). */
+  hidden: boolean;
+  quote: { id: string; code: string } | null;
+  statusEnteredAt: string;
+  completedAt: string | null;
+}
+
+export interface OrderHistoryView {
+  /** Old entries can name a column of the first board ("printed", "blocked"…). */
+  status: OrderStatus | LegacyStatus;
+  at: string;
+  by: string;
+  note: string;
+}
+
+export interface OrderView extends OrderCardView {
+  description: string;
+  orderDate: string;
+  plannedStart: string | null;
+  material: string;
+  colors: string;
+  estimatedMinutes: number | null;
+  estimatedGrams: number | null;
+  finishingNotes: string;
+  modelUrl: string;
+  internalNotes: string;
+  /** Financial fields: null unless the viewer has `finance:view`. */
+  agreedPrice: Money | null;
+  estimatedCost: Money | null;
+  costSummary: OrderCostView | null;
+  paidAt: string | null;
+  settledAt: string | null;
+  lastContactAt: string | null;
+  lastProgressAt: string | null;
+  saleId: string | null;
+  history: OrderHistoryView[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderListView {
+  orders: OrderCardView[];
+  /** Over every order of the business, whatever the filters. */
+  counts: { todo: number; inProgress: number; overdue: number; completed: number };
+  retentionDays: number;
+}
+
+/** A stock line of an order, with the item it came from. */
+export interface OrderMovementView extends StockMovementView {
+  itemName: string;
+  unit: 'g' | 'unit' | 'm' | 'ml' | 'custom';
+  customUnit: string;
+}
+
+/** An approved quote turned into the starting values of a new order, for review. */
+export interface OrderDraftView {
+  quote: { id: string; code: string; status: QuoteView['status'] };
+  /** An order already made from this quote: open it instead of making a duplicate. */
+  existingOrderId: string | null;
+  draft: {
+    title: string;
+    description: string;
+    productId: string | null;
+    quantity: number;
+    recipient: { kind: RecipientKind; customerId: string | null; name: string };
+    /** The quote total; null without financial access. */
+    agreedPrice: Money | null;
+    /** Null without financial access or without a linked calculation. */
+    estimatedCost: Money | null;
+    estimatedMinutes: number | null;
+    /** Micro-units of grams. */
+    estimatedGrams: number | null;
+  };
 }

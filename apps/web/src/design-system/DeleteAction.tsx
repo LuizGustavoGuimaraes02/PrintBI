@@ -10,6 +10,8 @@ interface DeleteActionProps {
   onDelete: () => Promise<void>;
   label?: string;
   size?: 'md' | 'sm';
+  /** Shown on hover: what deleting removes, and the gentler option if there is one. */
+  hint?: ReactNode;
 }
 
 /** A quiet "Delete" button that asks first. For records entered by mistake. */
@@ -20,6 +22,7 @@ export function DeleteAction({
   onDelete,
   label = 'Delete',
   size = 'md',
+  hint = 'Deletes it for good. Only for something entered by mistake.',
 }: DeleteActionProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -41,6 +44,7 @@ export function DeleteAction({
         size={size}
         className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
         onClick={() => setOpen(true)}
+        hint={hint}
       >
         {label}
       </Button>

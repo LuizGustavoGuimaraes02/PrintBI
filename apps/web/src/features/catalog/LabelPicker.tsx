@@ -66,13 +66,15 @@ interface LabelPickerProps {
   value: string[];
   onChange: (ids: string[]) => void;
   error?: string | undefined;
+  /** Keeps the "Labels" heading for screen readers only, where the row already names it. */
+  hideLegend?: boolean;
 }
 
 /**
  * Toggle the labels a product carries, or create a new one on the spot.
  * Archived labels only show while a product still carries them.
  */
-export function LabelPicker({ labels, value, onChange, error }: LabelPickerProps) {
+export function LabelPicker({ labels, value, onChange, error, hideLegend }: LabelPickerProps) {
   const toast = useToast();
   const refresh = useRefreshCatalog();
   const inputId = useId();
@@ -122,7 +124,9 @@ export function LabelPicker({ labels, value, onChange, error }: LabelPickerProps
 
   return (
     <fieldset className="flex min-w-0 flex-col gap-2.5">
-      <legend className="label-mono mb-1.5 text-ink-muted">Labels</legend>
+      <legend className={hideLegend ? 'sr-only' : 'label-mono mb-1.5 text-ink-muted'}>
+        Labels
+      </legend>
       <div role="group" aria-label="Choose labels" className="flex flex-wrap items-center gap-2">
         {shown.map((label) => {
           const on = value.includes(label.id);

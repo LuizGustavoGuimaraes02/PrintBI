@@ -198,11 +198,19 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
           canArchive && (
             <>
               {product.archived ? (
-                <Button variant="soft" onClick={() => void setArchived(false)}>
+                <Button
+                  variant="soft"
+                  hint="Puts it back in the catalog, ready for new quotes and sales."
+                  onClick={() => void setArchived(false)}
+                >
                   Restore
                 </Button>
               ) : (
-                <Button variant="ghost" onClick={() => setArchiving(true)}>
+                <Button
+                  variant="ghost"
+                  hint="Takes it out of the catalog for new quotes and sales. Past records keep it."
+                  onClick={() => setArchiving(true)}
+                >
                   Archive
                 </Button>
               )}
@@ -210,6 +218,7 @@ function ProductEditor({ product, initial, labels }: ProductEditorProps) {
                 title={`Delete ${product.name}?`}
                 description="Removed for good, with its photos. Use it for something added by mistake; archive what you stopped selling, to keep it in past records."
                 confirmLabel={product.type === 'service' ? 'Delete service' : 'Delete product'}
+                hint="Deletes it with its photos, for something added by mistake. Archive keeps it in past records."
                 onDelete={async () => {
                   try {
                     await api.delete(`/products/${product.id}`);

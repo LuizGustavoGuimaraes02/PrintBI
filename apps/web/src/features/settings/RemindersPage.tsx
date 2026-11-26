@@ -16,11 +16,11 @@ import { useSaveSettings } from './useSettingsSection';
 const formSchema = z.object({ reminders: reminderSettingsSchema, board: boardSettingsSchema });
 
 const THRESHOLDS = [
-  { name: 'quoteWaitingDays', label: 'Quote sent, no reply' },
-  { name: 'approvedNotStartedDays', label: 'Approved, not started' },
-  { name: 'inProgressDays', label: 'In progress for too long' },
-  { name: 'blockedDays', label: 'Blocked' },
-  { name: 'printedDays', label: 'Printed, not finished' },
+  { name: 'quoteWaitingDays', label: 'Waiting for the quote or the customer' },
+  { name: 'approvedNotStartedDays', label: 'To do, not started' },
+  { name: 'inProgressDays', label: 'Printing for too long' },
+  { name: 'blockedDays', label: 'Waiting for filament or a fix' },
+  { name: 'printedDays', label: 'Ready, not delivered' },
 ] as const;
 
 type ThresholdName = (typeof THRESHOLDS)[number]['name'];

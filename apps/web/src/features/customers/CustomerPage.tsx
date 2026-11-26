@@ -94,16 +94,30 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
             >
               Create quote
             </Link>
+            <Link
+              to={`/orders/new?customer=${customer.id}`}
+              className="inline-flex h-12 items-center rounded-full bg-teal-soft px-6 text-[15px] font-bold text-teal-ink hover:bg-[#d3eaee]"
+            >
+              New order
+            </Link>
             <Button variant="soft" onClick={() => setEditing(true)}>
               Edit
             </Button>
             {canArchive &&
               (customer.archived ? (
-                <Button variant="soft" onClick={() => void setArchived(false)}>
+                <Button
+                  variant="soft"
+                  hint="Puts them back in the customer list and the pickers."
+                  onClick={() => void setArchived(false)}
+                >
                   Restore
                 </Button>
               ) : (
-                <Button variant="ghost" onClick={() => setArchiving(true)}>
+                <Button
+                  variant="ghost"
+                  hint="Hides them from the list and from new quotes. Their history stays."
+                  onClick={() => setArchiving(true)}
+                >
                   Archive
                 </Button>
               ))}
@@ -112,6 +126,7 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
                 title={`Delete ${customer.name}?`}
                 description="Removed for good. Use it for a customer added by mistake; archive one you no longer serve, to keep their history."
                 confirmLabel="Delete customer"
+                hint="Deletes them for good, for a customer added by mistake. Archive keeps their history."
                 onDelete={async () => {
                   try {
                     await api.delete(`/customers/${customer.id}`);

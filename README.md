@@ -197,6 +197,16 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | GET, PUT          | `/quotes/:id`                                          | Member                                  |
 | DELETE            | `/quotes/:id`                                          | `records:archive`                       |
 | POST              | `/quotes/:id/actions`                                  | Member (send, approve, reject, …)       |
+| GET, POST         | `/orders`                                              | Member (filters in the query string)    |
+| GET               | `/orders/from-quote/:quoteId`                          | Member (prefill for review)             |
+| GET, PUT          | `/orders/:id`                                          | Member                                  |
+| POST              | `/orders/:id/move`                                     | Member; to/from Cancelled needs archive |
+| PATCH             | `/orders/:id/payment`                                  | `finance:manage`                        |
+| PATCH             | `/orders/:id/hold`                                     | Member (waiting flag, or null to clear) |
+| GET, PUT, DELETE  | `/orders/:id/picture`                                  | Member (PUT a data URL, 64 KB at most)  |
+| POST              | `/orders/:id/reminder`                                 | Member (contacted, snooze, unsnooze)    |
+| GET, POST         | `/orders/:id/movements`, `/orders/:id/consumptions`    | Member; POST needs `Idempotency-Key`    |
+| DELETE            | `/orders/:id`                                          | `records:archive`                       |
 | GET               | `/public/showcase/:slug/c/:collectionSlug`             | Public; 404 while the collection is off |
 | GET               | `/companies/current/showcase/collections`              | Member                                  |
 | PUT               | `/companies/current/showcase/collections/:key`         | `showcase:manage`                       |
@@ -289,15 +299,16 @@ Archive (or cancel, for expenses) stays available for records that really happen
 | ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Stock item or one roll  | `records:archive`          | Its ledger rows go with it. An expense that paid only for it can be deleted too (offered, needs `finance:manage`); a shared one is unlinked |
 | Expense                 | `finance:manage` + archive | Its payments go with it; the rolls it paid for stay, listed again as not recorded in expenses                                               |
-| Product or service      | `records:archive`          | Its photos are deleted from Cloudinary                                                                                                      |
-| Customer                | `records:archive`          | Nothing else points at customers yet                                                                                                        |
-| Label / customer source | Member                     | Taken off the products / customers that carry it                                                                                            |
+| Product or service      | `records:archive`          | Its photos are deleted from Cloudinary. Refused while an order uses it (archive it instead)                                                 |
+| Customer                | `records:archive`          | Refused while an order is for them (archive instead). Quotes keep their own copy of the details                                             |
+| Label / customer source | Member                     | Taken off the products, orders / customers that carry it                                                                                    |
 | Expense category        | `settings:manage`          | Refused while any expense uses it (archive it instead)                                                                                      |
-| Printer                 | `settings:manage`          | Nothing points at printers yet                                                                                                              |
+| Printer                 | `settings:manage`          | Refused while an order is assigned to it (archive it instead)                                                                               |
+| Quote                   | `records:archive`          | Refused while an order was made from it (delete that order first)                                                                           |
+| Order                   | `records:archive`          | Refused once it recorded stock use (cancel it instead: its ledger rows point to it)                                                         |
 
 Every delete is written to the audit log. Stock moved by an order or a sale can't be deleted, only
-archived; quotes, orders and sales (Parts 6 to 8) will add the same guard to the products,
-customers and printers they use.
+archived. Sales (Part 8) will add the same guards.
 
 ### Public showcase
 
@@ -434,6 +445,68 @@ Tokens are in [`apps/web/src/styles/index.css`](apps/web/src/styles/index.css).
 - `GET /health`: liveness (the process is up).
 - `GET /health/ready`: readiness (MongoDB is reachable); 503 otherwise.
 
+### Orders and the board
+
+- **One job per order**, of three types: sale, gift or personal. Only a sale has an agreed price and
+  a payment status (unpaid, partly paid, paid). Gifts and personal jobs record cost without revenue.
+  The recipient is a customer, a plain name or "Myself". One primary printer per order.
+- **Board columns:** To do, Printing, Ready, Done. Cancelled orders leave the board and keep their
+  history. Production and payment are separate: a card can be Ready and unpaid.
+- **Waiting flags instead of extra columns:** a card can wait for quote approval, the customer,
+  filament, a printer fix, a reprint or something else (`blocked` on the order, `PATCH
+/orders/:id/hold`). It keeps its column and shows the flag in orange; finishing or cancelling
+  clears it. Quote drafts and sent quotes live on the Quotes page.
+- **Moving from the first eight-column board:** `npm run migrate:order-stages -w @printbi/api -- --dry`
+  counts what would move, and without `--dry` it moves it: Quote draft and Waiting for customer go to
+  To do flagged "Waiting for quote approval", Blocked goes to To do with its reason, Printed goes to
+  Ready. Orders it has not reached yet are read the same way, and history keeps the old names.
+- **Manual order:** each card has a fractional string `rank` (`packages/shared/src/orders.ts`), so
+  a move writes only that card. Without a chosen spot (a new card, or "Move to" in the card), it
+  goes before the first card with a later deadline. The list view sorts late cards first, then the
+  nearest deadlines, then the rest.
+- **Adding:** "New order" and each column's "+ Add" open a centered window: a big title, then
+  one property per line (filament, for whom, type, due date, printer, quantity). "Show more" adds
+  price, payment, waiting for, priority and labels, and is remembered per person in the browser.
+  "Add another after this" keeps the window open. Editing uses the same list on its own page.
+- **Filament from stock:** the rolls in stock show as spools in their own color; the person taps
+  the roll they loaded (several for multicolor). The file never picks it, it only lists rolls of
+  its material first. Picked rolls are saved on the order (`filaments`, with the file's grams
+  for a single roll) and show on the card. Nothing is deducted.
+- **Card picture:** the plate preview from the print file becomes the card's picture; the person
+  can choose another photo or remove it. The browser shrinks it (400 px, WebP) and it is stored
+  apart from the order (`orderpictures`), so board lists stay light; its URL changes with it.
+- **Confirm print:** a card in Done that has deducted nothing shows "Confirm print". It opens the
+  usage dialog filled with the picked rolls and grams; confirming deducts them through the order,
+  like "Record usage" in the card, which stays as the manual way.
+- **Print file autofill** (`apps/web/src/features/orders/printFile.ts`): drop a `.3mf` (Bambu
+  Studio, OrcaSlicer, PrusaSlicer) or `.gcode` (PrusaSlicer, OrcaSlicer, Bambu Studio, Cura,
+  Simplify3D). It is read in the browser and never uploaded or stored. It fills the title, copies
+  as quantity, the matching printer, time and grams, and shows the plate thumbnail. A value already typed is never overwritten, and removing the file clears what it
+  filled. These are planning estimates: stock only changes when usage is recorded. A `.3mf` saved
+  before slicing has no time or weight; Cura only gives filament length, so its grams are
+  estimated (1.75 mm PLA).
+- **Drag and drop** with dnd-kit: mouse, long press on touch, and keyboard (space on a card's grip
+  button, arrows, space to drop), with spoken announcements.
+- **Moving never touches stock, payments or sales.** Usage is recorded explicitly from the card
+  ("Record usage"): several rolls and lots in one transaction, idempotent with `Idempotency-Key`,
+  "not enough stock" names the roll and deducts nothing. Ledger rows carry the order's id; the
+  order's `costSummary` (used and lost, per currency) is summed again from the ledger in the same
+  transaction, including corrections made with "Correct".
+- **Late** is computed from the due date (in the viewer's calendar day). **Reminders** use the
+  per-column thresholds in Settings → Reminders, counted from when the card entered its column, the
+  last "Contacted" or the last recorded usage. A flagged card uses its flag's threshold instead
+  (customer flags the quote one, the others the "waiting for filament or a fix" one), counted from
+  when the flag was set. Editing or opening a card doesn't reset them;
+  "Snooze" quiets one for 1, 3 or 7 days.
+- **Board retention:** a card becomes done when it is Completed (and Paid, for a sale). It leaves
+  the active board after the company's retention days (default 7), counted from that moment, and
+  stays findable under "Off the board". Reopening it, or the payment going back from Paid, brings
+  it back and restarts the count. Nothing is deleted.
+- **From a quote:** an approved quote offers "Create printing order", which opens the form
+  prefilled with the customer, items, agreed price, and the calculator's time, grams and cost
+  scaled to the quote's quantities. Approving creates nothing by itself. A unique index allows one
+  order per quote, and the quote links to its order.
+
 ## Testing
 
 `npm test` runs every workspace. API integration tests start **one** in-memory MongoDB replica set
@@ -450,11 +523,19 @@ about a minute to start; the test setup allows for that.
 3. Inventory (spools and lots, stock ledger) and expenses
 4. Catalog and customers · 4b public showcase · 4c seasonal showcases
 5. Calculator
-6. Quotes and PDF (this part)
-7. Orders and Kanban, stock consumption
+6. Quotes and PDF
+7. Orders and Kanban, stock consumption (this part)
 8. Sales and profit
 9. Dashboard and reminders
 10. Finish: accessibility, demo data, final docs, deploy configuration
+
+## Hints on actions
+
+Buttons whose effect isn't obvious from their label explain it on hover and keyboard focus
+(`hint` on `Button` and `DeleteAction`, or the `Hint` wrapper for links): what changes, what
+stays, and the gentler option when there is one ("Archive keeps the history"). Touch screens have
+no hover, so anything that matters, such as a stock deduction, is also said in the dialog that
+follows.
 
 ## Image slots
 
@@ -462,12 +543,13 @@ Places where the business owner uploads their own photos or artwork. Each slot s
 recommended size in the app and keeps a placeholder until something is uploaded. More slots are
 added as features are built.
 
-| Slot                            | Where it appears                                                      | Recommended size                                                                                                | Format / limit          |
-| ------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| Company logo                    | Settings → Business; showcase header (later the quote PDF)            | 512 × 512 (square, transparent)                                                                                 | PNG, SVG or WebP · 1 MB |
-| Product photos                  | Product page; showcase grid (first photo = cover) and product gallery | 1600 × 1600 (1:1), up to 8 per product                                                                          | JPG, WebP or PNG · 5 MB |
-| Seasonal banner                 | Banner/carousel at the top of the main showcase (per collection)      | 1920 × 640 desktop (3:1) · 1080 × 1350 mobile (4:5); text inside the central 60% · Portuguese, English optional | JPG or WebP · 5 MB      |
-| Seasonal page header (optional) | Top of a seasonal page, instead of the illustration                   | 1920 × 800, both languages                                                                                      | JPG or WebP · 5 MB      |
+| Slot                            | Where it appears                                                      | Recommended size                                                                                                 | Format / limit                         |
+| ------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Company logo                    | Settings → Business; showcase header; quote PDF                       | 512 × 512 (square, transparent)                                                                                  | PNG, SVG or WebP · 1 MB                |
+| Product photos                  | Product page; showcase grid (first photo = cover) and product gallery | 1600 × 1600 (1:1), up to 8 per product                                                                           | JPG, WebP or PNG · 5 MB                |
+| Seasonal banner                 | Banner/carousel at the top of the main showcase (per collection)      | 1920 × 640 desktop (3:1) · 1080 × 1350 mobile (4:5); text inside the central 60% · Portuguese, English optional  | JPG or WebP · 5 MB                     |
+| Order card picture              | Top of the order card on the board and of the order window            | Any; the browser shrinks it to 400 px on the longest side. The plate preview of a .3mf/.gcode is used by default | PNG, JPEG or WebP · stored up to 64 KB |
+| Seasonal page header (optional) | Top of a seasonal page, instead of the illustration                   | 1920 × 800, both languages                                                                                       | JPG or WebP · 5 MB                     |
 
 ## Data sources
 

@@ -14,6 +14,7 @@ import { showMoney } from '../../lib/money';
 import { showQuantity, unitLabel } from '../../lib/quantity';
 import { useIdempotencyKey } from '../../lib/useIdempotencyKey';
 import { useCan } from '../auth/account';
+import { useRefreshOrders } from '../orders/queries';
 import { useInventoryItems, useRefreshInventory } from './queries';
 
 interface Line {
@@ -45,26 +46,43 @@ interface ConsumeDialogProps {
   onClose: () => void;
   /** Opens with this item on the first line (from an item page). */
   itemId?: string;
+  /** Records the usage against this order (from the order card). */
+  order?: { id: string; title: string };
+  /** Starting lines, such as the rolls picked for an order with the file's grams. */
+  prefill?: { itemId: string; quantity: string }[];
+  /** Worded as confirming a finished print from the board. */
+  confirmPrint?: boolean;
 }
 
 /**
  * Records what a print actually used, or what a failed print wasted, across one or more
  * rolls and consumables. Everything is deducted in one step, or nothing is.
  */
-export function ConsumeDialog({ onClose, itemId }: ConsumeDialogProps) {
+export function ConsumeDialog({
+  onClose,
+  itemId,
+  order,
+  prefill,
+  confirmPrint,
+}: ConsumeDialogProps) {
   const toast = useToast();
-  const refresh = useRefreshInventory();
+  const refreshStock = useRefreshInventory();
+  const refreshOrders = useRefreshOrders();
+  const refresh = () => Promise.all([refreshStock(), order && refreshOrders()]);
   const canSeeFinance = useCan('finance:view');
   const idempotency = useIdempotencyKey();
   const { data: items = [] } = useInventoryItems({});
-  const usable = items.filter((i) => usableLots(i).length > 0 || i.id === itemId);
+  const picked = new Set([itemId, ...(prefill ?? []).map((p) => p.itemId)]);
+  const usable = items.filter((i) => usableLots(i).length > 0 || picked.has(i.id));
 
   const firstLot = (id: string) => usableLots(items.find((i) => i.id === id))[0]?.id ?? '';
   const [type, setType] = useState<'consumption' | 'loss'>('consumption');
   const [reason, setReason] = useState('');
-  const [lines, setLines] = useState<Line[]>([
-    { id: 1, itemId: itemId ?? '', lotId: '', quantity: '' },
-  ]);
+  const [lines, setLines] = useState<Line[]>(() =>
+    prefill?.length
+      ? prefill.map((p, i) => ({ id: i + 1, itemId: p.itemId, lotId: '', quantity: p.quantity }))
+      : [{ id: 1, itemId: itemId ?? '', lotId: '', quantity: '' }],
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -117,9 +135,13 @@ export function ConsumeDialog({ onClose, itemId }: ConsumeDialogProps) {
     }
     setSaving(true);
     try {
-      const movements = await api.post<StockMovementView[]>('/inventory/consumptions', payload, {
-        headers: idempotency.headers,
-      });
+      const movements = await api.post<StockMovementView[]>(
+        order ? `/orders/${order.id}/consumptions` : '/inventory/consumptions',
+        payload,
+        {
+          headers: idempotency.headers,
+        },
+      );
       idempotency.renew();
       await refresh();
       const first = details[0];
@@ -142,8 +164,18 @@ export function ConsumeDialog({ onClose, itemId }: ConsumeDialogProps) {
     <Modal
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Record usage"
-      description="Deducts what was really used from the rolls you pick. Nothing is deducted unless every line fits."
+      title={
+        confirmPrint && order
+          ? `Confirm print · ${order.title}`
+          : order
+            ? `Record usage · ${order.title}`
+            : 'Record usage'
+      }
+      description={
+        confirmPrint
+          ? 'Check the rolls and grams, then deduct them from stock. The grams come from the print file; change them if the print used more or less.'
+          : 'Deducts what was really used from the rolls you pick. Nothing is deducted unless every line fits.'
+      }
       width="lg"
       footer={
         <>
@@ -151,7 +183,7 @@ export function ConsumeDialog({ onClose, itemId }: ConsumeDialogProps) {
             Cancel
           </Button>
           <Button loading={saving} onClick={() => void submit()}>
-            Confirm and deduct
+            {confirmPrint ? 'Confirm print and deduct' : 'Confirm and deduct'}
           </Button>
         </>
       }

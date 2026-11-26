@@ -70,7 +70,14 @@ export function UnrecordedExpensesNotice() {
       <Notice
         tone="attention"
         title="Missing from Costs & Expenses"
-        action={<Button onClick={() => setOpen(true)}>Review and record</Button>}
+        action={
+          <Button
+            hint="Opens the list to check first. Confirming creates one expense per roll at its purchase price."
+            onClick={() => setOpen(true)}
+          >
+            Review and record
+          </Button>
+        }
       >
         {rolls} a price but no expense yet ({total(lots)}).
       </Notice>

@@ -1,4 +1,5 @@
 export * from './Button';
+export * from './Hint';
 export * from './cn';
 export * from './Dialog';
 export * from './Field';

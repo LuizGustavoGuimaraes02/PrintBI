@@ -262,9 +262,17 @@ export function ReverseDialog({
   item,
   movement,
   onClose,
-}: ItemDialogProps & { movement: StockMovementView }) {
+  onDone,
+}: {
+  item: Pick<InventoryItemView, 'unit' | 'customUnit'>;
+  movement: StockMovementView;
+  onClose: () => void;
+  /** Also refreshes what shows the entry elsewhere, such as an order. */
+  onDone?: () => Promise<unknown>;
+}) {
   const toast = useToast();
-  const refresh = useRefreshInventory();
+  const refreshStock = useRefreshInventory();
+  const refresh = () => Promise.all([refreshStock(), onDone?.()]);
   const idempotency = useIdempotencyKey();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);

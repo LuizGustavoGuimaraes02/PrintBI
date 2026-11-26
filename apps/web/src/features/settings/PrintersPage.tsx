@@ -270,6 +270,7 @@ export function PrintersPage() {
                         size="sm"
                         variant="ghost"
                         className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+                        hint="Removes it from your printers, with its costs. Orders keep showing its name."
                         onClick={() => setArchiving(printer)}
                       >
                         Delete

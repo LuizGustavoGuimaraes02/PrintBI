@@ -171,7 +171,15 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setDialog({ kind: 'consume' })} disabled={item.remaining === 0}>
+          <Button
+            hint={
+              item.remaining === 0
+                ? 'Nothing left to deduct: add a roll first.'
+                : 'Deducts what a print used from stock right away. For a job on the board, use Confirm print on its Done card instead, so it is not deducted twice.'
+            }
+            onClick={() => setDialog({ kind: 'consume' })}
+            disabled={item.remaining === 0}
+          >
             Record usage
           </Button>
           <Button variant="soft" onClick={() => setDialog({ kind: 'addLot' })}>
@@ -182,11 +190,20 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
           </Button>
           {canArchive &&
             (item.archived ? (
-              <Button variant="ghost" loading={archiving} onClick={() => void setArchived(false)}>
+              <Button
+                variant="ghost"
+                loading={archiving}
+                hint="Brings it back to the stock list and the pickers."
+                onClick={() => void setArchived(false)}
+              >
                 Restore
               </Button>
             ) : (
-              <Button variant="ghost" onClick={() => setDialog({ kind: 'archive' })}>
+              <Button
+                variant="ghost"
+                hint="Hides it from the list and the pickers. Its rolls, history and costs stay; you can restore it."
+                onClick={() => setDialog({ kind: 'archive' })}
+              >
                 Archive
               </Button>
             ))}
@@ -194,6 +211,7 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
             <Button
               variant="ghost"
               className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+              hint="Deletes it with its rolls and history, for something entered by mistake. Archive keeps the history."
               onClick={() => setDialog({ kind: 'delete' })}
             >
               Delete
@@ -341,6 +359,7 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                     <Button
                       size="sm"
                       variant="soft"
+                      hint="Sets the roll to what you weighed or counted. The difference is logged as a correction."
                       onClick={() => setDialog({ kind: 'adjust', lot })}
                     >
                       Correct quantity
@@ -355,6 +374,7 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                       size="sm"
                       variant="ghost"
                       className="text-hot-ink hover:bg-hot-soft hover:text-hot-ink"
+                      hint="Deletes this roll and its history, for a roll entered by mistake."
                       onClick={() => setDialog({ kind: 'delete', lot })}
                     >
                       Delete
@@ -425,6 +445,7 @@ function ItemDetail({ item }: { item: InventoryItemView }) {
                         <Button
                           size="sm"
                           variant="ghost"
+                          hint="Undoes this entry with a correction that gives the amount back. The original stays in the history."
                           onClick={() => setDialog({ kind: 'reverse', movement: m })}
                         >
                           Correct
@@ -489,7 +510,17 @@ function LotArchiveButton({ item, lot }: { item: InventoryItemView; lot: Invento
     }
   };
   return (
-    <Button size="sm" variant="ghost" loading={saving} onClick={() => void toggle()}>
+    <Button
+      size="sm"
+      variant="ghost"
+      loading={saving}
+      hint={
+        archived
+          ? 'Puts this roll back in use.'
+          : 'Sets this roll aside (empty or gone). It stops counting in stock; its history stays.'
+      }
+      onClick={() => void toggle()}
+    >
       {archived ? 'Restore' : 'Archive'}
     </Button>
   );

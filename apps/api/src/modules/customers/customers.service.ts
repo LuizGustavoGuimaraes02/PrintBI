@@ -2,6 +2,7 @@ import type { CustomerView, customerFiltersSchema, customerInputSchema } from '@
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
+import { assertNotInOrders } from '../orders/order-links';
 import { NotFoundError } from '../../core/errors';
 import {
   assertUsableSource,
@@ -131,6 +132,7 @@ export async function deleteCustomer(
   actorId: Types.ObjectId,
   id: Types.ObjectId,
 ): Promise<void> {
+  await assertNotInOrders(companyId, 'customer', id);
   const customer = await CustomerModel.findOneAndDelete(
     { _id: id, companyId },
     { projection: { name: 1 } },

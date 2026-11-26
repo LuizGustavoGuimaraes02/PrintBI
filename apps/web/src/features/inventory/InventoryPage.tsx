@@ -196,7 +196,13 @@ export function InventoryPage() {
         description="Every roll and consumable, what is left and what it cost."
         actions={
           <>
-            <Button variant="soft" onClick={() => setConsuming(true)}>
+            <Button
+              variant="soft"
+              hint={
+                'Deducts what a print used from stock right away. For a job on the board, use Confirm print on its Done card instead, so it is not deducted twice.'
+              }
+              onClick={() => setConsuming(true)}
+            >
               Record usage
             </Button>
             <Link

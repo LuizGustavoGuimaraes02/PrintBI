@@ -271,7 +271,13 @@ function PhotoManager({
               <ArrowRight size={16} />
             </IconButton>
             {index > 0 ? (
-              <Button variant="ghost" size="sm" disabled={uploading} onClick={() => move(index, 0)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={uploading}
+                hint="Shows this photo first: in the catalog, the showcase and quote PDFs."
+                onClick={() => move(index, 0)}
+              >
                 Make cover
               </Button>
             ) : (

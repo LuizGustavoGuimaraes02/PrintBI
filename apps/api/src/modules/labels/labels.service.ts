@@ -5,6 +5,7 @@ import { audit } from '../../core/audit/audit';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { CompanyModel } from '../companies/company.model';
 import { ProductModel } from '../products/product.model';
+import { OrderModel } from '../orders/order.model';
 
 interface LabelRecord {
   _id: Types.ObjectId;
@@ -152,5 +153,6 @@ export async function deleteLabel(
   );
   if (result.matchedCount !== 1) throw new NotFoundError('Label');
   await ProductModel.updateMany({ companyId, labelIds: labelId }, { $pull: { labelIds: labelId } });
+  await OrderModel.updateMany({ companyId, labelIds: labelId }, { $pull: { labelIds: labelId } });
   await audit({ companyId, actorId, action: 'label.deleted', entity: 'label', entityId: labelId });
 }

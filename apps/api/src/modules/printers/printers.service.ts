@@ -2,6 +2,7 @@ import type { Money, PrinterView, printerInputSchema } from '@printbi/shared';
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
+import { assertNotInOrders } from '../orders/order-links';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import { printerModelExists } from '../printer-catalog/printer-catalog.service';
 import { CompanyModel } from '../companies/company.model';
@@ -149,6 +150,7 @@ export async function deletePrinter(
   actorId: Types.ObjectId,
   printerId: Types.ObjectId,
 ): Promise<void> {
+  await assertNotInOrders(companyId, 'printer', printerId);
   const result = await CompanyModel.updateOne(
     { _id: companyId, 'printers._id': printerId },
     { $pull: { printers: { _id: printerId } } },

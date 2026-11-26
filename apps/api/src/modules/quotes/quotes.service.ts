@@ -18,11 +18,12 @@ import {
 import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
-import { AppError, NotFoundError, ValidationError } from '../../core/errors';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../../core/errors';
 import { CalculationModel } from '../calculations/calculation.model';
 import { CompanyModel } from '../companies/company.model';
 import { CustomerModel } from '../customers/customer.model';
 import { UserModel } from '../users/user.model';
+import { OrderModel } from '../orders/order.model';
 import { QuoteModel } from './quote.model';
 
 type QuoteInput = z.output<typeof quoteInputSchema>;
@@ -91,10 +92,10 @@ async function load(actor: QuoteActor, id: Types.ObjectId): Promise<QuoteRecord>
 
 async function toView(actor: QuoteActor, row: QuoteRecord): Promise<QuoteView> {
   const userIds = [...new Set(row.history.map((h) => h.by.toString()))];
-  const users = await UserModel.find(
-    { _id: { $in: userIds } },
-    { firstName: 1, lastName: 1 },
-  ).lean();
+  const [users, order] = await Promise.all([
+    UserModel.find({ _id: { $in: userIds } }, { firstName: 1, lastName: 1 }).lean(),
+    OrderModel.findOne({ companyId: actor.companyId, quoteId: row._id }, { _id: 1 }).lean(),
+  ]);
   const names = new Map(
     users.map((u) => [u._id.toString(), `${u.firstName} ${u.lastName}`.trim()]),
   );
@@ -147,6 +148,7 @@ async function toView(actor: QuoteActor, row: QuoteRecord): Promise<QuoteView> {
       by: names.get(h.by.toString()) ?? '',
       note: h.note ?? '',
     })),
+    orderId: order?._id.toString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -367,8 +369,13 @@ const PAST: Record<QuoteAction, string> = {
   reopen: 'reopened',
 };
 
-/** Deletes a quote made by mistake. (Once orders exist, a quote with one is cancelled instead.) */
+/** Deletes a quote made by mistake. One that became an order stays as that order's source. */
 export async function deleteQuote(actor: QuoteActor, id: Types.ObjectId): Promise<void> {
+  if (await OrderModel.exists({ companyId: actor.companyId, quoteId: id })) {
+    throw new ConflictError(
+      'An order was made from this quote. Delete that order first, or keep the quote.',
+    );
+  }
   const row = await QuoteModel.findOneAndDelete(
     { _id: id, companyId: actor.companyId },
     { projection: { number: 1 } },

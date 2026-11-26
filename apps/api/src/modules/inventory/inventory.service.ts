@@ -32,6 +32,8 @@ import { CompanyModel } from '../companies/company.model';
 import { ExpenseModel } from '../expenses/expense.model';
 import { createExpense } from '../expenses/expenses.service';
 import { filamentProductExists } from '../filament-catalog/filament-catalog.service';
+import { assertOrderExists, refreshOrderCost } from '../orders/order-links';
+import { OrderModel } from '../orders/order.model';
 import { UserModel } from '../users/user.model';
 import { InventoryItemModel, StockMovementModel } from './inventory.model';
 import { applyMovement, runOnce, type LedgerContext } from './stock-ledger';
@@ -797,6 +799,7 @@ export async function recordConsumption(
         orderId: input.orderId ? new Types.ObjectId(input.orderId) : null,
         saleId: input.saleId ? new Types.ObjectId(input.saleId) : null,
       };
+      if (ctx.orderId) await assertOrderExists(actor.companyId, ctx.orderId, session);
       const written = [];
       for (const [line, entry] of input.lines.entries()) {
         written.push(
@@ -811,6 +814,7 @@ export async function recordConsumption(
           }),
         );
       }
+      if (ctx.orderId) await refreshOrderCost(actor.companyId, ctx.orderId, session);
       return written.map((m) => m._id);
     },
     async (movements) => movements.map((m) => m._id),
@@ -899,7 +903,7 @@ export async function reverseMovement(
         orderId: original.orderId,
         saleId: original.saleId,
       };
-      return applyMovement(ctx, {
+      const correction = await applyMovement(ctx, {
         itemId: original.itemId,
         lotId: original.lotId,
         type: 'correction',
@@ -908,6 +912,8 @@ export async function reverseMovement(
         line: 0,
         reversalOf: movementId,
       });
+      if (original.orderId) await refreshOrderCost(actor.companyId, original.orderId, session);
+      return correction;
     },
     async (movements) => movements[0],
   );
@@ -1269,7 +1275,7 @@ async function linkedExpenses(actor: Actor, target: StockTarget, session?: Clien
 
 /**
  * Movements tied to an order or a sale are part of that record's history: such stock is
- * archived, not deleted. (Orders and sales arrive in later parts; the check is ready.)
+ * archived, not deleted.
  */
 async function assertNotUsedByOrders(actor: Actor, target: StockTarget, session?: ClientSession) {
   const used = await StockMovementModel.exists({
@@ -1364,6 +1370,12 @@ export async function deleteStock(
       // Rows of rolls deleted earlier are gone already; this catches any stray ones.
       await StockMovementModel.deleteMany({ companyId: actor.companyId, itemId }, { session });
       await InventoryItemModel.deleteOne({ _id: itemId, companyId: actor.companyId }, { session });
+      // A roll entered by mistake drops out of the orders that had it picked.
+      await OrderModel.updateMany(
+        { companyId: actor.companyId, 'filaments.itemId': itemId },
+        { $pull: { filaments: { itemId } } },
+        { session },
+      );
     }
     await audit(
       {
