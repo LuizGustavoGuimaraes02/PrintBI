@@ -24,6 +24,7 @@ import { CompanyModel } from '../companies/company.model';
 import { CustomerModel } from '../customers/customer.model';
 import { UserModel } from '../users/user.model';
 import { OrderModel } from '../orders/order.model';
+import { SaleModel } from '../sales/sale.model';
 import { QuoteModel } from './quote.model';
 
 type QuoteInput = z.output<typeof quoteInputSchema>;
@@ -92,9 +93,10 @@ async function load(actor: QuoteActor, id: Types.ObjectId): Promise<QuoteRecord>
 
 async function toView(actor: QuoteActor, row: QuoteRecord): Promise<QuoteView> {
   const userIds = [...new Set(row.history.map((h) => h.by.toString()))];
-  const [users, order] = await Promise.all([
+  const [users, order, sale] = await Promise.all([
     UserModel.find({ _id: { $in: userIds } }, { firstName: 1, lastName: 1 }).lean(),
     OrderModel.findOne({ companyId: actor.companyId, quoteId: row._id }, { _id: 1 }).lean(),
+    SaleModel.findOne({ companyId: actor.companyId, quoteId: row._id }, { _id: 1 }).lean(),
   ]);
   const names = new Map(
     users.map((u) => [u._id.toString(), `${u.firstName} ${u.lastName}`.trim()]),
@@ -149,6 +151,7 @@ async function toView(actor: QuoteActor, row: QuoteRecord): Promise<QuoteView> {
       note: h.note ?? '',
     })),
     orderId: order?._id.toString() ?? null,
+    saleId: sale?._id.toString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -374,6 +377,11 @@ export async function deleteQuote(actor: QuoteActor, id: Types.ObjectId): Promis
   if (await OrderModel.exists({ companyId: actor.companyId, quoteId: id })) {
     throw new ConflictError(
       'An order was made from this quote. Delete that order first, or keep the quote.',
+    );
+  }
+  if (await SaleModel.exists({ companyId: actor.companyId, quoteId: id })) {
+    throw new ConflictError(
+      'A sale was registered from this quote. Delete that sale first, or keep the quote.',
     );
   }
   const row = await QuoteModel.findOneAndDelete(

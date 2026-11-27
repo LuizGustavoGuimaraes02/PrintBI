@@ -22,6 +22,7 @@ const showcase = () => import('../features/showcase/pages');
 const calculator = () => import('../features/calculator/pages');
 const quotes = () => import('../features/quotes/pages');
 const orders = () => import('../features/orders/pages');
+const sales = () => import('../features/sales/pages');
 
 const placeholders: RouteObject[] = NAV_ITEMS.filter((item) => item.part).map((item) => ({
   path: item.to.slice(1),
@@ -85,6 +86,9 @@ export const routes: RouteObject[] = [
               { path: 'orders', ...page(orders, 'OrdersPage') },
               { path: 'orders/new', ...page(orders, 'OrderFormPage') },
               { path: 'orders/:orderId/edit', ...page(orders, 'OrderFormPage') },
+              { path: 'sales', ...page(sales, 'SalesPage') },
+              { path: 'sales/new', ...page(sales, 'SalePage') },
+              { path: 'sales/:saleId', ...page(sales, 'SalePage') },
               { path: 'quotes', ...page(quotes, 'QuotesPage') },
               { path: 'quotes/new', ...page(quotes, 'QuoteEditorPage') },
               { path: 'quotes/:quoteId', ...page(quotes, 'QuoteEditorPage') },

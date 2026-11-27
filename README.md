@@ -207,6 +207,13 @@ from `/api` to the API host), because the session cookies are `SameSite=Strict`.
 | POST              | `/orders/:id/reminder`                                 | Member (contacted, snooze, unsnooze)    |
 | GET, POST         | `/orders/:id/movements`, `/orders/:id/consumptions`    | Member; POST needs `Idempotency-Key`    |
 | DELETE            | `/orders/:id`                                          | `records:archive`                       |
+| GET, POST         | `/sales`                                               | `finance:view`; POST `finance:manage`   |
+| GET               | `/sales/draft`                                         | `finance:view` (order, quote, calc…)    |
+| GET, PUT          | `/sales/:id`                                           | `finance:view`; PUT `finance:manage`    |
+| POST, DELETE      | `/sales/:id/receipts`, `/sales/:id/receipts/:receipt`  | `finance:manage`                        |
+| POST              | `/sales/:id/cancel`                                    | `finance:manage` + `records:archive`    |
+| GET, POST         | `/sales/:id/movements`, `/sales/:id/consumptions`      | POST `finance:manage`, Idempotency-Key  |
+| DELETE            | `/sales/:id`                                           | `finance:manage` + `records:archive`    |
 | GET               | `/public/showcase/:slug/c/:collectionSlug`             | Public; 404 while the collection is off |
 | GET               | `/companies/current/showcase/collections`              | Member                                  |
 | PUT               | `/companies/current/showcase/collections/:key`         | `showcase:manage`                       |
@@ -299,16 +306,17 @@ Archive (or cancel, for expenses) stays available for records that really happen
 | ----------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Stock item or one roll  | `records:archive`          | Its ledger rows go with it. An expense that paid only for it can be deleted too (offered, needs `finance:manage`); a shared one is unlinked |
 | Expense                 | `finance:manage` + archive | Its payments go with it; the rolls it paid for stay, listed again as not recorded in expenses                                               |
-| Product or service      | `records:archive`          | Its photos are deleted from Cloudinary. Refused while an order uses it (archive it instead)                                                 |
-| Customer                | `records:archive`          | Refused while an order is for them (archive instead). Quotes keep their own copy of the details                                             |
+| Product or service      | `records:archive`          | Its photos are deleted from Cloudinary. Refused while an order or a sale uses it (archive it instead)                                       |
+| Customer                | `records:archive`          | Refused while an order or a sale is for them (archive instead). Quotes keep their own copy of the details                                   |
 | Label / customer source | Member                     | Taken off the products, orders / customers that carry it                                                                                    |
 | Expense category        | `settings:manage`          | Refused while any expense uses it (archive it instead)                                                                                      |
 | Printer                 | `settings:manage`          | Refused while an order is assigned to it (archive it instead)                                                                               |
-| Quote                   | `records:archive`          | Refused while an order was made from it (delete that order first)                                                                           |
-| Order                   | `records:archive`          | Refused once it recorded stock use (cancel it instead: its ledger rows point to it)                                                         |
+| Quote                   | `records:archive`          | Refused while an order or a sale was made from it (delete that first)                                                                       |
+| Order                   | `records:archive`          | Refused once it recorded stock use (cancel it instead: its ledger rows point to it) or while it has a sale                                  |
 
 Every delete is written to the audit log. Stock moved by an order or a sale can't be deleted, only
-archived. Sales (Part 8) will add the same guards.
+archived. A sale can be deleted (finance:manage and records:archive) until it records stock use;
+deleting it frees its order, whose payment is then set by hand again.
 
 ### Public showcase
 
@@ -507,6 +515,31 @@ Tokens are in [`apps/web/src/styles/index.css`](apps/web/src/styles/index.css).
   scaled to the quote's quantities. Approving creates nothing by itself. A unique index allows one
   order per quote, and the quote links to its order.
 
+### Sales and profit
+
+- **A sale** is direct (the counter, a walk-in customer), or made from an approved quote, a
+  sale order or a saved calculation, prefilled for review. It is numbered VEN-0001 and copies
+  each line's description, price and product labels, so later catalog edits never change it.
+  Each order and each quote makes one sale (unique indexes on `orderId` and `quoteId`).
+- **Total** = lines − discount + delivery charged to the customer. **Receipts** are separate
+  from the amount sold: partial payments add up until it is paid. Production (to start, in
+  production, ready, delivered) is separate too; a sale linked to an order follows the order's
+  column, and the order's payment follows the sale's receipts (its own payment control steps
+  aside), so the board's done-and-paid retention keeps working.
+- **Profit** = total − material cost − costs the business entered for that sale (shipping it
+  paid, platform or card fees, packaging, labor). Material cost is the recorded stock use (on
+  the linked order, or recorded on the sale when it has no order); until then it is the lines'
+  estimate, and the page and the list say "estimated". Nothing is counted twice: a sale with an
+  order never records stock of its own.
+- **Currencies:** each sale keeps its own currency, and summaries list one total per currency.
+  The BRL-per-CAD rate in Settings → Currency is saved with each sale when it is made, to convert
+  stock bought in the other currency; changing the rate later never rewrites old sales. Without a
+  rate, those costs are shown apart instead of being added.
+- **Cancelling** keeps the sale and its receipts on record and takes it out of the totals; stock
+  used and money received are not reversed.
+- Sales need financial access. Customers show their sales count to everyone and the total bought
+  to people with financial access; products show how many units were sold.
+
 ## Testing
 
 `npm test` runs every workspace. API integration tests start **one** in-memory MongoDB replica set
@@ -524,8 +557,8 @@ about a minute to start; the test setup allows for that.
 4. Catalog and customers · 4b public showcase · 4c seasonal showcases
 5. Calculator
 6. Quotes and PDF
-7. Orders and Kanban, stock consumption (this part)
-8. Sales and profit
+7. Orders and Kanban, stock consumption
+8. Sales and profit (this part)
 9. Dashboard and reminders
 10. Finish: accessibility, demo data, final docs, deploy configuration
 

@@ -34,6 +34,7 @@ import { createExpense } from '../expenses/expenses.service';
 import { filamentProductExists } from '../filament-catalog/filament-catalog.service';
 import { assertOrderExists, refreshOrderCost } from '../orders/order-links';
 import { OrderModel } from '../orders/order.model';
+import { assertSaleTakesStock, refreshSaleCost } from '../sales/sale-links';
 import { UserModel } from '../users/user.model';
 import { InventoryItemModel, StockMovementModel } from './inventory.model';
 import { applyMovement, runOnce, type LedgerContext } from './stock-ledger';
@@ -800,6 +801,7 @@ export async function recordConsumption(
         saleId: input.saleId ? new Types.ObjectId(input.saleId) : null,
       };
       if (ctx.orderId) await assertOrderExists(actor.companyId, ctx.orderId, session);
+      if (ctx.saleId) await assertSaleTakesStock(actor.companyId, ctx.saleId, session);
       const written = [];
       for (const [line, entry] of input.lines.entries()) {
         written.push(
@@ -815,6 +817,7 @@ export async function recordConsumption(
         );
       }
       if (ctx.orderId) await refreshOrderCost(actor.companyId, ctx.orderId, session);
+      if (ctx.saleId) await refreshSaleCost(actor.companyId, ctx.saleId, session);
       return written.map((m) => m._id);
     },
     async (movements) => movements.map((m) => m._id),
@@ -913,6 +916,7 @@ export async function reverseMovement(
         reversalOf: movementId,
       });
       if (original.orderId) await refreshOrderCost(actor.companyId, original.orderId, session);
+      if (original.saleId) await refreshSaleCost(actor.companyId, original.saleId, session);
       return correction;
     },
     async (movements) => movements[0],

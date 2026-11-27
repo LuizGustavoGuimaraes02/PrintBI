@@ -28,6 +28,7 @@ import {
   TextAreaField,
   TextField,
   useToast,
+  Hint,
 } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
 import { useCan } from '../auth/account';
@@ -116,6 +117,7 @@ function CalculatorEditor({
   brlPerCad,
 }: EditorProps) {
   const toast = useToast();
+  const canManageMoney = useCan('finance:manage');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const refresh = useRefreshCalculations();
@@ -923,15 +925,27 @@ function CalculatorEditor({
               </Button>
             </div>
             {saved ? (
-              <Link
-                to={`/quotes/new?calculation=${saved.id}`}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-teal-soft px-5 text-sm font-bold text-teal-ink hover:bg-[#d3eaee]"
-              >
-                Create a quote from it
-              </Link>
+              <div className="flex flex-col gap-2">
+                <Link
+                  to={`/quotes/new?calculation=${saved.id}`}
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-teal-soft px-5 text-sm font-bold text-teal-ink hover:bg-[#d3eaee]"
+                >
+                  Create a quote from it
+                </Link>
+                {canManageMoney && (
+                  <Hint text="Opens a new sale with this calculation's price and estimated cost, to review before saving. Nothing is deducted from stock.">
+                    <Link
+                      to={`/sales/new?calculation=${saved.id}`}
+                      className="inline-flex h-11 items-center justify-center rounded-full bg-surface px-5 text-sm font-bold text-teal hover:bg-teal-soft"
+                    >
+                      Register a sale from it
+                    </Link>
+                  </Hint>
+                )}
+              </div>
             ) : (
               <p className="text-right text-[12px] text-ink-muted">
-                Save it to make a quote from it. Sales arrive in Part 8.
+                Save it to make a quote or a sale from it.
               </p>
             )}
           </Panel>

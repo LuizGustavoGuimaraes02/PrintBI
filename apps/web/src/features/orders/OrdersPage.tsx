@@ -10,9 +10,17 @@ import {
   type OrderType,
 } from '@printbi/shared';
 import { ChevronDown, Columns3, List, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Button, cn, EmptyState, PageHeader, PageLoader, Panel } from '../../design-system';
+import {
+  Button,
+  cn,
+  EmptyState,
+  FilterPill,
+  PageHeader,
+  PageLoader,
+  Panel,
+} from '../../design-system';
 import { localToday, rangeFor, type PeriodKey } from '../../lib/period';
 import { useLabels, useProducts } from '../catalog/queries';
 import { useCustomers } from '../customers/queries';
@@ -277,14 +285,14 @@ export function OrdersPage() {
 
         {showFilters && (
           <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-tile)] bg-bench p-2.5">
-            <Filter label="Type" value={get('type')} onChange={(v) => update({ type: v })}>
+            <FilterPill label="Type" value={get('type')} onChange={(v) => update({ type: v })}>
               {ORDER_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {TYPE_LABEL[t]}
                 </option>
               ))}
-            </Filter>
-            <Filter
+            </FilterPill>
+            <FilterPill
               label="Priority"
               value={get('priority')}
               onChange={(v) => update({ priority: v })}
@@ -294,16 +302,20 @@ export function OrdersPage() {
                   {PRIORITY_LABEL[p]}
                 </option>
               ))}
-            </Filter>
-            <Filter label="Deadline" value={deadline} onChange={(v) => update({ deadline: v })}>
+            </FilterPill>
+            <FilterPill label="Deadline" value={deadline} onChange={(v) => update({ deadline: v })}>
               {Object.entries(DEADLINE_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
-            </Filter>
+            </FilterPill>
             {labelList.length > 0 && (
-              <Filter label="Label" value={get('labelId')} onChange={(v) => update({ labelId: v })}>
+              <FilterPill
+                label="Label"
+                value={get('labelId')}
+                onChange={(v) => update({ labelId: v })}
+              >
                 {labelList
                   .filter((l: LabelView) => !l.archived)
                   .map((l) => (
@@ -311,10 +323,10 @@ export function OrdersPage() {
                       {l.name}
                     </option>
                   ))}
-              </Filter>
+              </FilterPill>
             )}
             {products.length > 0 && (
-              <Filter
+              <FilterPill
                 label="Product"
                 value={get('productId')}
                 onChange={(v) => update({ productId: v })}
@@ -324,10 +336,10 @@ export function OrdersPage() {
                     {p.name}
                   </option>
                 ))}
-              </Filter>
+              </FilterPill>
             )}
             {customers.length > 0 && (
-              <Filter
+              <FilterPill
                 label="Customer"
                 value={get('customerId')}
                 onChange={(v) => update({ customerId: v })}
@@ -337,9 +349,9 @@ export function OrdersPage() {
                     {c.name}
                   </option>
                 ))}
-              </Filter>
+              </FilterPill>
             )}
-            <Filter
+            <FilterPill
               label="Board"
               value={get('board')}
               onChange={(v) => update({ board: v })}
@@ -349,15 +361,19 @@ export function OrdersPage() {
                 {data ? `Off the board (done ${data.retentionDays}+ days)` : 'Off the board'}
               </option>
               <option value="all">Everything</option>
-            </Filter>
+            </FilterPill>
             {view === 'list' && (
-              <Filter label="Status" value={get('status')} onChange={(v) => update({ status: v })}>
+              <FilterPill
+                label="Status"
+                value={get('status')}
+                onChange={(v) => update({ status: v })}
+              >
                 {ORDER_STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {STATUS_LABEL[s]}
                   </option>
                 ))}
-              </Filter>
+              </FilterPill>
             )}
           </div>
         )}
@@ -455,44 +471,5 @@ function Stat({ value, label }: { value: number; label: string }) {
     <span>
       <span className="figure font-medium text-ink">{value}</span> {label}
     </span>
-  );
-}
-
-/** A filter pill: the native select keeps keyboard and screen-reader behaviour, styled flat. */
-function Filter({
-  label,
-  value,
-  onChange,
-  empty,
-  children,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  empty?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label
-      className={cn(
-        'relative flex h-9 items-center rounded-full border-[1.5px] bg-surface pl-3 text-sm focus-within:border-teal',
-        value ? 'border-teal bg-teal-soft text-teal-ink' : 'border-rule',
-      )}
-    >
-      <span className="font-semibold">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-full max-w-48 cursor-pointer appearance-none border-0 bg-transparent pr-8 pl-1.5 font-semibold text-ink-muted outline-none"
-      >
-        <option value="">{empty ?? 'Any'}</option>
-        {children}
-      </select>
-      <ChevronDown
-        size={14}
-        aria-hidden="true"
-        className="pointer-events-none absolute right-3 text-ink-muted"
-      />
-    </label>
   );
 }

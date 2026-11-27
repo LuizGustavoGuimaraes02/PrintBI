@@ -8,6 +8,7 @@ import {
   nextSettledAt,
   quoteCode,
   rankBetween,
+  saleCode,
   roundToCents,
   staleReminder,
   sum,
@@ -58,6 +59,7 @@ import { movementViews, recordConsumption } from '../inventory/inventory.service
 import { ProductModel } from '../products/product.model';
 import { QuoteModel } from '../quotes/quote.model';
 import { UserModel } from '../users/user.model';
+import { SaleModel } from '../sales/sale.model';
 import { OrderPictureModel } from './order-picture.model';
 import { OrderModel, upgradeLegacyStatus } from './order.model';
 
@@ -194,7 +196,7 @@ async function linkedNames(companyId: Types.ObjectId, rows: OrderRecord[]) {
   const itemIds = [
     ...new Set(rows.flatMap((r) => (r.filaments ?? []).map((f) => f.itemId.toString()))),
   ];
-  const [customers, products, quotes, items] = await Promise.all([
+  const [customers, products, quotes, items, sales] = await Promise.all([
     CustomerModel.find(
       { companyId, _id: { $in: ids((r) => r.recipient.customerId) } },
       { name: 1 },
@@ -207,12 +209,14 @@ async function linkedNames(companyId: Types.ObjectId, rows: OrderRecord[]) {
           { name: 1, filament: 1 },
         ).lean()
       : [],
+    SaleModel.find({ companyId, _id: { $in: ids((r) => r.saleId) } }, { number: 1 }).lean(),
   ]);
   return {
     customers: new Map(customers.map((c) => [c._id.toString(), c.name])),
     products: new Map(products.map((p) => [p._id.toString(), p.name])),
     quotes: new Map(quotes.map((q) => [q._id.toString(), quoteCode(q.number)])),
     items: new Map(items.map((i) => [i._id.toString(), i])),
+    sales: new Map(sales.map((s) => [s._id.toString(), saleCode(s.number)])),
   };
 }
 
@@ -342,7 +346,9 @@ async function fullView(actor: OrderActor, row: OrderRecord, today?: string): Pr
     settledAt: iso(row.settledAt),
     lastContactAt: iso(row.reminder?.lastContactAt),
     lastProgressAt: iso(row.reminder?.lastProgressAt),
-    saleId: row.saleId?.toString() ?? null,
+    sale: row.saleId
+      ? { id: row.saleId.toString(), code: names.sales.get(row.saleId.toString()) ?? '' }
+      : null,
     history: row.statusHistory.map((h) => ({
       status: h.status,
       at: h.at.toISOString(),
@@ -787,6 +793,13 @@ export async function setPayment(
   if (current.type !== 'sale') {
     throw new AppError(409, 'NOT_A_SALE', 'Gifts and personal jobs have nothing to pay');
   }
+  if (current.saleId) {
+    throw new AppError(
+      409,
+      'PAID_BY_SALE',
+      'This order has a sale: record the receipts on the sale and the payment follows.',
+    );
+  }
   const now = new Date();
   const paidAt =
     paymentStatus !== 'paid' ? null : current.paymentStatus === 'paid' ? current.paidAt : now;
@@ -845,6 +858,9 @@ export async function deleteOrder(actor: OrderActor, id: Types.ObjectId): Promis
   const current = await load(actor, id);
   if (await StockMovementModel.exists({ companyId: actor.companyId, orderId: id })) {
     throw new ConflictError('This order recorded stock use. Cancel it instead: its history stays.');
+  }
+  if (current.saleId) {
+    throw new ConflictError('This order has a sale. Delete or cancel the sale first.');
   }
   await OrderModel.deleteOne({ _id: id, companyId: actor.companyId });
   await OrderPictureModel.deleteOne({ companyId: actor.companyId, orderId: id });

@@ -124,6 +124,7 @@ function QuoteEditor({
   const queryClient = useQueryClient();
   const refresh = useRefreshQuotes();
   const canSeeCosts = useCan('finance:view');
+  const canManageMoney = useCan('finance:manage');
   const canDelete = useCan('records:archive');
   const { data: customers } = useCustomers();
   const { data: products } = useProducts();
@@ -299,6 +300,26 @@ function QuoteEditor({
                       className="inline-flex h-12 items-center rounded-full bg-teal px-6 text-[15px] font-bold text-white hover:bg-teal-strong"
                     >
                       Create printing order
+                    </Link>
+                  </Hint>
+                )
+              )}
+              {quote.saleId ? (
+                <Link
+                  to={`/sales/${quote.saleId}`}
+                  className="inline-flex h-12 items-center rounded-full bg-teal-soft px-6 text-[15px] font-bold text-teal-ink hover:bg-[#d3eaee]"
+                >
+                  Open its sale
+                </Link>
+              ) : (
+                quote.status === 'approved' &&
+                canManageMoney && (
+                  <Hint text="Opens a new sale filled from this quote to review. One quote makes one sale; nothing is deducted from stock.">
+                    <Link
+                      to={`/sales/new?quote=${quote.id}`}
+                      className="inline-flex h-12 items-center rounded-full bg-teal-soft px-6 text-[15px] font-bold text-teal-ink hover:bg-[#d3eaee]"
+                    >
+                      Register sale
                     </Link>
                   </Hint>
                 )

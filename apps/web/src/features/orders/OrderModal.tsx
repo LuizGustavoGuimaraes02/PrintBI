@@ -19,6 +19,7 @@ import {
   Button,
   cn,
   DeleteAction,
+  Hint,
   Modal,
   NozzleLoader,
   Notice,
@@ -101,6 +102,7 @@ function OrderDetails({
   const refresh = useRefreshOrders();
   const canSeeMoney = useCan('finance:view');
   const canPay = useCan('finance:manage');
+  const canRegisterSale = canPay && canSeeMoney;
   const canArchive = useCan('records:archive');
   const { data: movements } = useOrderMovements(order.id);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -218,7 +220,27 @@ function OrderDetails({
             ))}
           </SelectField>
         )}
-        {canPay && order.type === 'sale' && (
+        {order.type === 'sale' && order.sale && (
+          <Hint text="This order's payment follows the receipts recorded on its sale.">
+            <Link
+              to={`/sales/${order.sale.id}`}
+              className="inline-flex h-12 items-center rounded-full bg-surface px-5 text-[15px] font-bold text-teal hover:bg-teal-soft"
+            >
+              Sale <span className="figure ml-1.5">{order.sale.code}</span>
+            </Link>
+          </Hint>
+        )}
+        {canRegisterSale && order.type === 'sale' && !order.sale && !cancelled && (
+          <Hint text="Opens a new sale filled from this order to review. Its receipts then decide this order's payment. Nothing is deducted from stock.">
+            <Link
+              to={`/sales/new?order=${order.id}`}
+              className="inline-flex h-12 items-center rounded-full bg-surface px-5 text-[15px] font-bold text-teal hover:bg-teal-soft"
+            >
+              Register sale
+            </Link>
+          </Hint>
+        )}
+        {canPay && order.type === 'sale' && !order.sale && (
           <SelectField
             label="Payment"
             value={order.paymentStatus}

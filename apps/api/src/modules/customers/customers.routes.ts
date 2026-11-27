@@ -25,6 +25,7 @@ customersRouter.get('/', async (req, res) => {
     await service.listCustomers(
       getCompanyAuth(req).companyId,
       parseInput(customerFiltersSchema, req.query),
+      getCompanyAuth(req).permissions.includes('finance:view'),
     ),
   );
 });
@@ -43,7 +44,14 @@ customersRouter.post('/', async (req, res) => {
 });
 
 customersRouter.get('/:customerId', async (req, res) => {
-  res.json(await service.getCustomer(getCompanyAuth(req).companyId, id(req.params.customerId)));
+  const auth = getCompanyAuth(req);
+  res.json(
+    await service.getCustomer(
+      auth.companyId,
+      id(req.params.customerId),
+      auth.permissions.includes('finance:view'),
+    ),
+  );
 });
 
 customersRouter.put('/:customerId', async (req, res) => {

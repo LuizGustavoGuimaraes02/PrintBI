@@ -7,6 +7,7 @@ import {
   type StockMovementView,
 } from '@printbi/shared';
 import { Plus, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, cn, Modal, Notice, SelectField, TextField, useToast } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
@@ -48,6 +49,8 @@ interface ConsumeDialogProps {
   itemId?: string;
   /** Records the usage against this order (from the order card). */
   order?: { id: string; title: string };
+  /** Records the usage against a sale without an order. */
+  sale?: { id: string; title: string };
   /** Starting lines, such as the rolls picked for an order with the file's grams. */
   prefill?: { itemId: string; quantity: string }[];
   /** Worded as confirming a finished print from the board. */
@@ -62,13 +65,20 @@ export function ConsumeDialog({
   onClose,
   itemId,
   order,
+  sale,
   prefill,
   confirmPrint,
 }: ConsumeDialogProps) {
   const toast = useToast();
   const refreshStock = useRefreshInventory();
   const refreshOrders = useRefreshOrders();
-  const refresh = () => Promise.all([refreshStock(), order && refreshOrders()]);
+  const queryClient = useQueryClient();
+  const refresh = () =>
+    Promise.all([
+      refreshStock(),
+      order && refreshOrders(),
+      sale && queryClient.invalidateQueries({ queryKey: ['sales'] }),
+    ]);
   const canSeeFinance = useCan('finance:view');
   const idempotency = useIdempotencyKey();
   const { data: items = [] } = useInventoryItems({});
@@ -136,7 +146,11 @@ export function ConsumeDialog({
     setSaving(true);
     try {
       const movements = await api.post<StockMovementView[]>(
-        order ? `/orders/${order.id}/consumptions` : '/inventory/consumptions',
+        order
+          ? `/orders/${order.id}/consumptions`
+          : sale
+            ? `/sales/${sale.id}/consumptions`
+            : '/inventory/consumptions',
         payload,
         {
           headers: idempotency.headers,
@@ -167,8 +181,8 @@ export function ConsumeDialog({
       title={
         confirmPrint && order
           ? `Confirm print · ${order.title}`
-          : order
-            ? `Record usage · ${order.title}`
+          : order || sale
+            ? `Record usage · ${(order ?? sale)!.title}`
             : 'Record usage'
       }
       description={

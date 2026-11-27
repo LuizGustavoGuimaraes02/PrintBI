@@ -12,3 +12,4 @@ export * from './ColorSwatch';
 export * from './SearchCombobox';
 export * from './DeleteAction';
 export * from './InlineDelete';
+export * from './FilterPill';

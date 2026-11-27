@@ -15,6 +15,7 @@ import {
 } from '../../design-system';
 import { api, ApiError } from '../../lib/api';
 import { useCan } from '../auth/account';
+import { useSales } from '../sales/queries';
 import { CustomerDialog } from './CustomerDialog';
 import { useCustomer, useRefreshCustomers, whatsappLink } from './queries';
 
@@ -49,6 +50,7 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
   const refresh = useRefreshCustomers();
   const canArchive = useCan('records:archive');
   const canSeeFinance = useCan('finance:view');
+  const canManageMoney = useCan('finance:manage');
   const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const navigate = useNavigate();
@@ -94,6 +96,14 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
             >
               Create quote
             </Link>
+            {canManageMoney && (
+              <Link
+                to={`/sales/new?customer=${customer.id}`}
+                className="inline-flex h-12 items-center rounded-full bg-teal-soft px-6 text-[15px] font-bold text-teal-ink hover:bg-[#d3eaee]"
+              >
+                Register sale
+              </Link>
+            )}
             <Link
               to={`/orders/new?customer=${customer.id}`}
               className="inline-flex h-12 items-center rounded-full bg-teal-soft px-6 text-[15px] font-bold text-teal-ink hover:bg-[#d3eaee]"
@@ -205,9 +215,13 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
               </div>
             )}
           </div>
-          <EmptyState title="No quotes or sales yet">
-            Quotes, orders and sales for {customer.name.split(' ')[0]} will be listed here.
-          </EmptyState>
+          {canSeeFinance ? (
+            <CustomerSales customerId={customer.id} firstName={customer.name.split(' ')[0] ?? ''} />
+          ) : (
+            <p className="text-[15px] text-ink-muted">
+              Sales are shown to people with financial access.
+            </p>
+          )}
         </Panel>
       </div>
 
@@ -221,5 +235,40 @@ function CustomerDetail({ customer }: { customer: CustomerView }) {
         onConfirm={() => void setArchived(true)}
       />
     </>
+  );
+}
+
+/** This customer's sales, newest first, with what is still owed. */
+function CustomerSales({ customerId, firstName }: { customerId: string; firstName: string }) {
+  const { data } = useSales({ customerId, cancelled: 'false' });
+  if (!data) return <PageLoader label="Loading sales" />;
+  if (data.sales.length === 0) {
+    return <EmptyState title="No sales yet">Sales for {firstName} will be listed here.</EmptyState>;
+  }
+  const owed = data.summary.receivable.filter((m) => m.amount > 0);
+  return (
+    <div className="flex flex-col gap-3">
+      {owed.length > 0 && (
+        <p className="text-[15px] font-semibold text-hot-ink">
+          Still to receive {owed.map((m) => formatMoney(m)).join(' + ')}
+        </p>
+      )}
+      <ul className="flex flex-col divide-y divide-rule-soft">
+        {data.sales.map((sale) => (
+          <li key={sale.id}>
+            <Link
+              to={`/sales/${sale.id}`}
+              className="grid grid-cols-[88px_minmax(0,1fr)_auto] items-baseline gap-3 rounded-xl px-2 py-2.5 hover:bg-bench"
+            >
+              <span className="figure text-[13px] font-semibold">{sale.code}</span>
+              <span className="truncate text-[14px]">{sale.items}</span>
+              <span className="figure text-[14px] font-semibold">
+                {formatMoney({ amount: sale.total, currency: sale.currency })}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

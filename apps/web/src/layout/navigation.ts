@@ -27,7 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/inventory', label: 'Inventory', icon: Boxes },
   { to: '/expenses', label: 'Costs & Expenses', icon: Receipt },
   { to: '/products', label: 'Products & Services', icon: Package },
-  { to: '/sales', label: 'Sales & Profit', icon: TrendingUp, part: '8' },
+  { to: '/sales', label: 'Sales & Profit', icon: TrendingUp },
   { to: '/calculator', label: 'Calculator', icon: Calculator },
   { to: '/quotes', label: 'Quotes', icon: FileText },
   { to: '/customers', label: 'Customers', icon: Users },

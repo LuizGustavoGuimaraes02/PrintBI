@@ -12,6 +12,7 @@ import type { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
 import { assertNotInOrders } from '../orders/order-links';
+import { assertNotInSales, soldByProduct } from '../sales/sale-links';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { deleteImage, imageView, type StoredImage } from '../../core/media/cloudinary';
 import { confirmUpload, productImageRule } from '../../core/media/uploads';
@@ -64,7 +65,14 @@ export async function toViews(
   rows: ProductRecord[],
   finance: boolean,
 ): Promise<ProductView[]> {
-  const labels = new Map((await loadLabels(companyId)).map((l) => [l._id.toString(), l]));
+  const [labelList, sold] = await Promise.all([
+    loadLabels(companyId),
+    soldByProduct(
+      companyId,
+      rows.map((p) => p._id),
+    ),
+  ]);
+  const labels = new Map(labelList.map((l) => [l._id.toString(), l]));
   return rows.map((p) => ({
     id: p._id.toString(),
     type: p.type,
@@ -98,7 +106,7 @@ export async function toViews(
       collections: p.showcase?.collections ?? [],
     },
     archived: Boolean(p.archivedAt),
-    soldQuantity: 0,
+    soldQuantity: sold.get(p._id.toString()) ?? 0,
     updatedAt: p.updatedAt.toISOString(),
   }));
 }
@@ -444,6 +452,7 @@ export async function deleteProduct(
   id: Types.ObjectId,
 ): Promise<void> {
   await assertNotInOrders(companyId, 'product', id);
+  await assertNotInSales(companyId, 'product', id);
   const product = (await ProductModel.findOneAndDelete(
     { _id: id, companyId },
     { projection: { name: 1, images: 1 } },

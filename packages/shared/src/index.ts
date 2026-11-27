@@ -17,3 +17,5 @@ export * from './quotes';
 export * from './schemas/quote';
 export * from './orders';
 export * from './schemas/order';
+export * from './sales';
+export * from './schemas/sale';

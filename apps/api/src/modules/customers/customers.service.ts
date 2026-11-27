@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import type { z } from 'zod';
 import { audit } from '../../core/audit/audit';
 import { assertNotInOrders } from '../orders/order-links';
+import { assertNotInSales, salesByCustomer } from '../sales/sale-links';
 import { NotFoundError } from '../../core/errors';
 import {
   assertUsableSource,
@@ -13,8 +14,16 @@ import { CustomerModel, type Customer } from './customer.model';
 
 type CustomerRecord = Customer & { _id: Types.ObjectId; createdAt: Date };
 
-const toView = (c: CustomerRecord, sources: Map<string, SourceRecord>): CustomerView => {
+type SalesStats = Awaited<ReturnType<typeof salesByCustomer>>;
+
+const toView = (
+  c: CustomerRecord,
+  sources: Map<string, SourceRecord>,
+  sales: SalesStats,
+  finance: boolean,
+): CustomerView => {
   const source = c.sourceId ? sources.get(c.sourceId.toString()) : undefined;
+  const stats = sales.get(c._id.toString());
   return {
     id: c._id.toString(),
     name: c.name,
@@ -26,8 +35,8 @@ const toView = (c: CustomerRecord, sources: Map<string, SourceRecord>): Customer
     source: source ? { id: source._id.toString(), name: source.name } : null,
     sourceDetail: c.sourceDetail ?? '',
     archived: Boolean(c.archivedAt),
-    salesCount: 0,
-    totalPurchased: [],
+    salesCount: stats?.count ?? 0,
+    totalPurchased: finance ? (stats?.totals ?? []) : [],
     createdAt: c.createdAt.toISOString(),
   };
 };
@@ -40,6 +49,7 @@ const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$
 export async function listCustomers(
   companyId: Types.ObjectId,
   filters: z.output<typeof customerFiltersSchema>,
+  finance = false,
 ): Promise<CustomerView[]> {
   const query: Record<string, unknown> = {
     companyId,
@@ -55,16 +65,25 @@ export async function listCustomers(
     CustomerModel.find(query).sort({ name: 1 }).limit(500).lean(),
     sourceMap(companyId),
   ]);
-  return (rows as CustomerRecord[]).map((c) => toView(c, sources));
+  const sales = await salesByCustomer(
+    companyId,
+    rows.map((r) => r._id),
+  );
+  return (rows as CustomerRecord[]).map((c) => toView(c, sources, sales, finance));
 }
 
 export async function getCustomer(
   companyId: Types.ObjectId,
   id: Types.ObjectId,
+  finance = false,
 ): Promise<CustomerView> {
   const row = await CustomerModel.findOne({ _id: id, companyId }).lean();
   if (!row) throw new NotFoundError('Customer');
-  return toView(row as CustomerRecord, await sourceMap(companyId));
+  const [sources, sales] = await Promise.all([
+    sourceMap(companyId),
+    salesByCustomer(companyId, [row._id]),
+  ]);
+  return toView(row as CustomerRecord, sources, sales, finance);
 }
 
 export async function createCustomer(
@@ -133,6 +152,7 @@ export async function deleteCustomer(
   id: Types.ObjectId,
 ): Promise<void> {
   await assertNotInOrders(companyId, 'customer', id);
+  await assertNotInSales(companyId, 'customer', id);
   const customer = await CustomerModel.findOneAndDelete(
     { _id: id, companyId },
     { projection: { name: 1 } },

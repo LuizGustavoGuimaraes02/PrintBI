@@ -14,6 +14,7 @@ import { authRouter } from './modules/auth/auth.routes';
 import { calculationsRouter } from './modules/calculations/calculations.routes';
 import { quotesRouter } from './modules/quotes/quotes.routes';
 import { ordersRouter } from './modules/orders/orders.routes';
+import { salesRouter } from './modules/sales/sales.routes';
 import { companiesRouter } from './modules/companies/companies.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { customerSourcesRouter } from './modules/customer-sources/customer-sources.routes';
@@ -78,6 +79,7 @@ export function createApp({ corsOrigins = env.CORS_ORIGINS }: AppOptions = {}): 
   api.use('/calculations', calculationsRouter);
   api.use('/quotes', quotesRouter);
   api.use('/orders', ordersRouter);
+  api.use('/sales', salesRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

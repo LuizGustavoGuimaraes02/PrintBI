@@ -2,12 +2,20 @@
  * Response shapes of the API, shared with the web app. Dates are ISO strings;
  * money is `{ amount, currency }` with `amount` in integer micro-units.
  */
-import type { Money } from './money';
+import type { Currency, Money } from './money';
+import type { PaymentMethod } from './schemas/inventory';
 import type { Permission, Role } from './permissions';
 import type { CalcResult } from './calculator';
 import type { CalcInput } from './schemas/calculator';
 import type { BreakdownRow } from './quotes';
 import type { StaleReminder } from './orders';
+import type { SaleProfit } from './sales';
+import type {
+  SaleCustomerKind,
+  SalePayment,
+  SaleProduction,
+  SaleProductionView,
+} from './schemas/sale';
 import type {
   BlockReason,
   LegacyStatus,
@@ -632,6 +640,8 @@ export interface QuoteView {
   history: QuoteHistoryView[];
   /** The order made from this quote, if any. */
   orderId: string | null;
+  /** The sale registered from this quote, if any. */
+  saleId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -736,7 +746,8 @@ export interface OrderView extends OrderCardView {
   settledAt: string | null;
   lastContactAt: string | null;
   lastProgressAt: string | null;
-  saleId: string | null;
+  /** The sale registered from this order, which then decides its payment. */
+  sale: { id: string; code: string } | null;
   history: OrderHistoryView[];
   createdAt: string;
   updatedAt: string;
@@ -774,5 +785,111 @@ export interface OrderDraftView {
     estimatedMinutes: number | null;
     /** Micro-units of grams. */
     estimatedGrams: number | null;
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sales
+// ---------------------------------------------------------------------------------------------
+
+export interface SaleLineView {
+  productId: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  /** quantity × unit price, rounded, minus the discount. */
+  amount: number;
+  estimatedCost: number | null;
+  /** The product's labels when the sale was saved. */
+  labels: { id: string; name: string }[];
+}
+
+export interface SaleReceiptView {
+  id: string;
+  amount: number;
+  receivedAt: string;
+  method: PaymentMethod;
+  note: string;
+  by: string;
+}
+
+/** A row in the sales list. Money is in the sale's own currency; cost and profit need finance. */
+export interface SaleListItemView {
+  id: string;
+  code: string;
+  saleDate: string;
+  customer: { kind: SaleCustomerKind; customerId: string | null; name: string };
+  currency: Currency;
+  /** "Keychain ×10, Phone stand ×5". */
+  items: string;
+  total: number;
+  received: number;
+  outstanding: number;
+  payment: SalePayment;
+  production: SaleProductionView;
+  profit: SaleProfit;
+  cancelled: boolean;
+  order: { id: string; title: string } | null;
+  quote: { id: string; code: string } | null;
+}
+
+export interface SaleView extends SaleListItemView {
+  lines: SaleLineView[];
+  subtotal: number;
+  discount: number;
+  delivery: number;
+  costs: { label: string; amount: number }[];
+  receipts: SaleReceiptView[];
+  notes: string;
+  source: { id: string; name: string } | null;
+  /** The production set by hand; a linked order decides `production` instead. */
+  manualProduction: SaleProduction;
+  /** BRL per CAD saved with the sale, for costs recorded in the other currency. */
+  brlPerCad: number | null;
+  /** Stock used for this sale (through its order, or recorded on it), per currency. */
+  recorded: { materials: Money[]; losses: Money[]; unpricedLines: number; lines: number };
+  estimatedCost: number | null;
+  cancelReason: string;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleListView {
+  sales: SaleListItemView[];
+  /** Over the sales listed, cancelled ones left out; one entry per currency, never mixed. */
+  summary: {
+    count: number;
+    sold: Money[];
+    received: Money[];
+    receivable: Money[];
+    costs: Money[];
+    profit: Money[];
+    /** Sales whose material cost is still an estimate (or unknown). */
+    estimated: number;
+  };
+}
+
+/** A new sale prefilled from an order, an approved quote or a calculation, for review. */
+export interface SaleDraftView {
+  from: { kind: 'order' | 'quote' | 'calculation' | 'customer'; id: string; label: string } | null;
+  /** A sale already made from this order or quote: open it instead of making another. */
+  existingSaleId: string | null;
+  draft: {
+    customer: { kind: SaleCustomerKind; customerId: string | null; name: string };
+    currency: Currency;
+    lines: {
+      productId: string | null;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      discount: number;
+      estimatedCost: number | null;
+    }[];
+    discount: number;
+    delivery: number;
+    quoteId: string | null;
+    orderId: string | null;
   };
 }

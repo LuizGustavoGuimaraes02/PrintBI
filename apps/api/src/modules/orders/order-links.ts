@@ -1,4 +1,15 @@
-import { multiply, roundToCents, type Currency, type Money } from '@printbi/shared';
+import {
+  isSettled,
+  multiply,
+  nextSettledAt,
+  roundToCents,
+  type Currency,
+  type Money,
+  type OrderStatus,
+  type OrderType,
+  type PaymentStatus,
+  type SalePayment,
+} from '@printbi/shared';
 import type { ClientSession, Types } from 'mongoose';
 import { ConflictError, NotFoundError } from '../../core/errors';
 import { StockMovementModel } from '../inventory/inventory.model';
@@ -75,6 +86,54 @@ export async function refreshOrderCost(
   await OrderModel.updateOne(
     { _id: orderId, companyId },
     { $set: { costSummary: summarizeUsage(rows), 'reminder.lastProgressAt': new Date() } },
+    { session },
+  );
+}
+
+/**
+ * A sale registered from an order decides the order's payment: the order shows it, and the
+ * board's retention clock (done and paid) follows the sale's receipts. `sale: null` unlinks it
+ * and leaves the payment as it was, to be changed by hand again.
+ */
+export async function syncOrderWithSale(
+  companyId: Types.ObjectId,
+  orderId: Types.ObjectId,
+  sale: { id: Types.ObjectId; payment: SalePayment; total: Money } | null,
+  session?: ClientSession,
+): Promise<void> {
+  const order = (await OrderModel.findOne(
+    { _id: orderId, companyId },
+    { type: 1, status: 1, paymentStatus: 1, paidAt: 1, settledAt: 1 },
+  )
+    .session(session ?? null)
+    .lean()) as {
+    type: OrderType;
+    status: OrderStatus;
+    paymentStatus: PaymentStatus;
+    paidAt?: Date | null;
+    settledAt?: Date | null;
+  } | null;
+  if (!order) throw new NotFoundError('Order');
+  if (!sale) {
+    await OrderModel.updateOne(
+      { _id: orderId, companyId },
+      { $set: { saleId: null } },
+      { session },
+    );
+    return;
+  }
+  const now = new Date();
+  const paymentStatus: PaymentStatus = sale.payment;
+  const paidAt =
+    paymentStatus !== 'paid' ? null : order.paymentStatus === 'paid' ? (order.paidAt ?? now) : now;
+  const settledAt = nextSettledAt(
+    order.settledAt ?? null,
+    isSettled({ type: order.type, status: order.status, paymentStatus }),
+    now,
+  );
+  await OrderModel.updateOne(
+    { _id: orderId, companyId },
+    { $set: { saleId: sale.id, paymentStatus, paidAt, settledAt, agreedPrice: sale.total } },
     { session },
   );
 }
